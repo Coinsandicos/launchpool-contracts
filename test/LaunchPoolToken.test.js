@@ -43,7 +43,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
 
   context('With one token added to the staking pools', () => {
     beforeEach(async () => {
-      this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
+      this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
 
       this.xtp = await MockERC20.new('LPToken', 'LP', ONE_THOUSAND_TOKENS.mul(new BN('4')), {from: minter});
       await this.xtp.transfer(bob, ONE_THOUSAND_TOKENS, {from: minter});
@@ -55,44 +55,59 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       // 100 per block farming rate starting at block 100 with all issuance ending on block 200
       this.staking = await LaunchPoolStaking.new(
         this.launchPoolToken.address,
-        to18DP('10000'), // 10k rewards
+        to18DP('1000'), // 1k rewards = 10 rewards per block
         '100', // start mining block number
         '200', // end mining block number
         {from: adminAlice}
       );
 
+      // transfer tokens to launch pool so they can be allocation accordingly
       await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
 
       // add the first and only pool
       await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
 
-      assert.equal((await this.staking.lptPerBlock()).toString(),  to18DP('100'));
+      // Confirm reward per block
+      assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
 
+      // Deposit liquidity into pool
       await this.xtp.approve(this.staking.address, '1000', {from: bob});
       await this.staking.deposit(POOL_ZERO, '100', {from: bob});
       await time.advanceBlockTo('89');
 
+      // trigger pool update before block reward started, ensure all zeros still
       await this.staking.updatePool(POOL_ZERO, {from: bob}); // block 90
       assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), '0');
       assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), '0');
 
+      // Move into block 110 to trigger 10 block reward
       await time.advanceBlockTo('110');
-      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('1000'));
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('100')); // 10 blocks x 10
 
       // for master-chef to trigger a pending payment you deposit a zero amount
       // this updates the internal balances and pays any owed reward tokens
       await this.staking.deposit(POOL_ZERO, '0', {from: bob});
-      assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), to18DP('1000'));
+      assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), to18DP('110')); // moved 10 + 1 for execution = 11 blocks past = 11 x 10 = 110
       assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('0'));
 
-      // TODO advance to end of staking and check balances
+      // move to block before end time
+      await time.advanceBlockTo('199');
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('880')); // 88 due 11 blocks which are already claimed
 
-      // TODO advance after end (200) and check no more rewards
+      // Claim them on block 200
+      await this.staking.deposit(POOL_ZERO, '0', {from: bob});
+      assert.equal((await time.latestBlock()).toString(), '200'); // confirm now on the cusp
 
-      // assert.equal((await this.deFiCasinoToken.balanceOf(bob)).toString(), '80');
-      // await time.advanceBlockTo('104');
-      // await this.chef.harvest(stakeTokenInternalId, {from: bob}); // block 105
-      // assert.equal((await this.deFiCasinoToken.balanceOf(bob)).toString(), '400');
+      assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), to18DP('1000')); // all claims 100 X 10 = 1000
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('0')); // no remaining lpt
+
+      // move after closed
+      await time.advanceBlockTo('201');
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('10')); // still no remaining lpt
+
+      // no change after claiming
+      await this.staking.deposit(POOL_ZERO, '0', {from: bob});
+      assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), to18DP('1000')); // balance stays same
     });
 
     // FIXME as test above but with 2 people in a pool
