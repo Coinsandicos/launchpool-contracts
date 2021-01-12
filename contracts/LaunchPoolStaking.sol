@@ -115,7 +115,8 @@ contract LaunchPoolStaking is Ownable {
         uint256 accLptPerShare = pool.accLptPerShare;
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
-            uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
+            uint256 maxEndBlock = block.number <= endBlock ? block.number : endBlock;
+            uint256 multiplier = getMultiplier(pool.lastRewardBlock, maxEndBlock);
             uint256 LptReward = multiplier.mul(lptPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
             accLptPerShare = accLptPerShare.add(LptReward.mul(1e18).div(lpSupply));
         }
@@ -141,10 +142,11 @@ contract LaunchPoolStaking is Ownable {
             pool.lastRewardBlock = block.number;
             return;
         }
-        uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number <= endBlock ? block.number : endBlock);
+        uint256 maxEndBlock = block.number <= endBlock ? block.number : endBlock;
+        uint256 multiplier = getMultiplier(pool.lastRewardBlock, maxEndBlock);
         uint256 lptReward = multiplier.mul(lptPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
         pool.accLptPerShare = pool.accLptPerShare.add(lptReward.mul(1e18).div(lpSupply));
-        pool.lastRewardBlock = block.number;
+        pool.lastRewardBlock = maxEndBlock;
     }
 
     // Deposit LP tokens to staking contract for LPT allocation.

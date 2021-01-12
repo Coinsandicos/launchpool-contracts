@@ -110,7 +110,148 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), to18DP('1000')); // balance stays same
     });
 
-    // FIXME as test above but with 2 people in a pool
+    it('should issue reward tokens correctly with two people in the pool of the same share holdings', async () => {
+
+      // 100 per block farming rate starting at block 100 with all issuance ending on block 200
+      this.staking = await LaunchPoolStaking.new(
+        this.launchPoolToken.address,
+        to18DP('1000'), // 1k rewards = 10 rewards per block, split by two people = 5 per person per block
+        '100', // start mining block number
+        '200', // end mining block number
+        {from: adminAlice}
+      );
+
+      // transfer tokens to launch pool so they can be allocation accordingly
+      await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
+
+      // add the first and only pool
+      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+
+      // Confirm reward per block
+      assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
+
+      // Deposit liquidity into pool from Bob
+      await this.xtp.approve(this.staking.address, '1000', {from: bob});
+      await this.staking.deposit(POOL_ZERO, '100', {from: bob});
+
+      // Deposit liquidity into pool from Carol
+      await this.xtp.approve(this.staking.address, '1000', {from: carol});
+      await this.staking.deposit(POOL_ZERO, '100', {from: carol});
+
+      await time.advanceBlockTo('89');
+
+      // trigger pool update before block reward started, ensure all zeros still
+      await checkRewards(POOL_ZERO, bob, '0', '0');
+      await checkRewards(POOL_ZERO, carol, '0', '0');
+
+      // Move into block 100 to trigger 1 block reward
+      await time.advanceBlockTo('101');
+
+      // 1 block past, 50/50 split = 5 per person per block
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('5'));
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, carol)).toString(), to18DP('5'));
+
+      // move to 50% through the reward schedule
+      await time.advanceBlockTo('150');
+      await checkRewards(POOL_ZERO, bob, '0', '255');
+      await checkRewards(POOL_ZERO, carol, '0', '260'); // 255 + 1 block = 260
+
+      // bob claims
+      await this.staking.deposit(POOL_ZERO, '0', {from: bob});
+      await checkRewards(POOL_ZERO, bob, '265', '0', false);
+
+      // carol claims
+      await this.staking.deposit(POOL_ZERO, '0', {from: carol});
+      await checkRewards(POOL_ZERO, carol, '270', '0', false); // + 1 block
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('5')); // bob now due another 5
+
+      // Move to close pool
+      await time.advanceBlockTo('201');
+
+      await this.staking.deposit(POOL_ZERO, '0', {from: bob});
+      await checkRewards(POOL_ZERO, bob, '500', '0', false);
+
+      await this.staking.deposit(POOL_ZERO, '0', {from: carol});
+      await checkRewards(POOL_ZERO, carol, '500', '0', false);
+    });
+
+    it.only('should issue reward tokens correctly with two people in one pool but with different holdings', async () => {
+
+      /////////////////////////////
+      // Bob holds 30% of pool   //
+      // carol holds 70% of pool //
+      /////////////////////////////
+
+      // 100 per block farming rate starting at block 100 with all issuance ending on block 200
+      this.staking = await LaunchPoolStaking.new(
+        this.launchPoolToken.address,
+        to18DP('1000'), // 1k rewards = 10 rewards per block
+        '100', // start mining block number
+        '200', // end mining block number
+        {from: adminAlice}
+      );
+
+      // transfer tokens to launch pool so they can be allocation accordingly
+      await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
+
+      // add the first and only pool
+      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+
+      // Confirm reward per block
+      assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
+
+      // Deposit liquidity into pool from Bob
+      await this.xtp.approve(this.staking.address, '1000', {from: bob});
+      await this.staking.deposit(POOL_ZERO, '30', {from: bob});
+
+      // Deposit liquidity into pool from Carol
+      await this.xtp.approve(this.staking.address, '1000', {from: carol});
+      await this.staking.deposit(POOL_ZERO, '70', {from: carol});
+
+      await time.advanceBlockTo('89');
+
+      // trigger pool update before block reward started, ensure all zeros still
+      await checkRewards(POOL_ZERO, bob, '0', '0');
+      await checkRewards(POOL_ZERO, carol, '0', '0');
+
+      // Move into block 100 to trigger 1 block reward
+      await time.advanceBlockTo('101');
+
+      // 1 block past, 30/70 split
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('3'));
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, carol)).toString(), to18DP('7'));
+
+      // move to 50% through the reward schedule
+      await time.advanceBlockTo('150');
+      await checkRewards(POOL_ZERO, bob, '0', '153'); // 50 * 3 + 1 block = 153
+      await checkRewards(POOL_ZERO, carol, '0', '364'); // 50 * 7 + 2 block = 364
+
+      // bob claims
+      await this.staking.deposit(POOL_ZERO, '0', {from: bob});
+      await checkRewards(POOL_ZERO, bob, '159', '0', false);
+
+      // carol claims
+      await this.staking.deposit(POOL_ZERO, '0', {from: carol});
+      await checkRewards(POOL_ZERO, carol, '378', '0', false); // + 1 block
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('3')); // bob now due another 3
+
+      // Move to close pool
+      await time.advanceBlockTo('201');
+
+      await this.staking.deposit(POOL_ZERO, '0', {from: bob});
+      await checkRewards(POOL_ZERO, bob, '300', '0', false);
+
+      await this.staking.deposit(POOL_ZERO, '0', {from: carol});
+      await checkRewards(POOL_ZERO, carol, '700', '0', false);
+    });
+
+    const checkRewards = async (pool, from, lptUserBalance, lptPendingBalance, updatePool = true) => {
+      if (updatePool) {
+        await this.staking.updatePool(pool, {from});
+      }
+      assert.equal((await this.launchPoolToken.balanceOf(from)).toString(), to18DP(lptUserBalance));
+      assert.equal((await this.staking.pendingLpt(pool, from)).toString(), to18DP(lptPendingBalance));
+    };
 
     // FIXME as test about but with 2 pools and 1 person in each
 
