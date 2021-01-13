@@ -590,9 +590,13 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
 
   describe('owner functions', () => {
 
+    const startBlock = '0';
+    const endBlock = '100';
+
     beforeEach(async () => {
       this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
-      this.xtp = await MockERC20.new('TAP Token', 'XTP', '10000000000', {from: minter});
+
+      this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP');
 
       this.staking = await LaunchPoolStaking.new(
         this.launchPoolToken.address,
@@ -603,12 +607,18 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       );
     });
 
-    it.skip('can not "add" if not owner', async () => {
-      // FIXME todo
+    it('can not "add" if not owner', async () => {
+      await expectRevert(
+        this.staking.add('100', this.xtp.address, true, {from: bob}),
+        'Ownable: caller is not the owner'
+      );
     });
 
-    it.skip('can not "set" if not owner', async () => {
-      // FIXME todo
+    it('can not "set" if not owner', async () => {
+      await expectRevert(
+        this.staking.set(POOL_ZERO, '100', true, {from: bob}),
+        'Ownable: caller is not the owner'
+      );
     });
   });
 });
