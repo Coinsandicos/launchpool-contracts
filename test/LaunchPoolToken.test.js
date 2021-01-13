@@ -82,37 +82,40 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
 
       // trigger pool update before block reward started, ensure all zeros still
       await this.staking.updatePool(POOL_ZERO, {from: bob}); // block 90
-      assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), '0');
-      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), '0');
+      await checkRewards(POOL_ZERO, bob, '0', '0');
 
       // Move into block 110 to trigger 10 block reward
       await time.advanceBlockTo(this.startBlock.add(toBn('110')));
-      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('100')); // 10 blocks x 10
+      await checkRewards(POOL_ZERO, bob, '0', '100', false); // 10 blocks x 10
 
       // for master-chef to trigger a pending payment you deposit a zero amount
       // this updates the internal balances and pays any owed reward tokens
       await this.staking.deposit(POOL_ZERO, '0', {from: bob});
-      assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), to18DP('110')); // moved 10 + 1 for execution = 11 blocks past = 11 x 10 = 110
-      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('0'));
+      await checkRewards(POOL_ZERO, bob, '110', '0', false); // moved 10 + 1 for execution = 11 blocks past = 11 x 10 = 110
 
       // move to block before end time
       await time.advanceBlockTo(this.startBlock.add(toBn('199')));
-      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('880')); // 88 due 11 blocks which are already claimed
+      await checkRewards(POOL_ZERO, bob, '110', '880', false); // 88 due 11 blocks which are already claimed
 
       // Claim them on block 200
       await this.staking.deposit(POOL_ZERO, '0', {from: bob});
       assert.equal((await time.latestBlock()).toString(), this.startBlock.add(toBn('200'))); // confirm now on the cusp
 
-      assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), to18DP('1000')); // all claims 100 X 10 = 1000
-      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('0')); // no remaining lpt
+      // all claims 100 X 10 = 1000
+      // no remaining lpt
+      await checkRewards(POOL_ZERO, bob, '1000', '0', false);
 
       // move after closed
       await time.advanceBlockTo(this.startBlock.add(toBn('201')));
-      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), to18DP('0')); // still no remaining lpt
+      // still no remaining lpt
+      await checkRewards(POOL_ZERO, bob, '1000', '0', false);
 
       // no change after claiming
       await this.staking.deposit(POOL_ZERO, '0', {from: bob});
-      assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), to18DP('1000')); // balance stays same
+
+      // balance stays same
+      await checkRewards(POOL_ZERO, bob, '1000', '0', false);
+
     });
 
     it('should issue reward tokens correctly with two people in the pool of the same share holdings', async () => {
@@ -277,6 +280,9 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       this.xrp = await makeCoinAndSetupUsers('XRPPooCoin', 'XRP');
       await this.staking.add('50', this.xrp.address, true, {from: adminAlice});
 
+      // check pool length now
+      assert.equal((await this.staking.poolLength()).toString(), '2');
+
       // Deposit liquidity into pool 0
       await this.xtp.approve(this.staking.address, '1000', {from: bob});
       await this.staking.deposit(POOL_ZERO, '100', {from: bob});
@@ -339,12 +345,71 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
     });
   });
 
+  context('emergencyWithdraw()', async () => {
+
+    beforeEach(async () => {
+      this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
+
+      // setup initial LP coin
+      this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP');
+
+      this.startBlock = await time.latestBlock();
+      console.log('Starting block', this.startBlock.toString());
+    });
+
+    it('should allow emergency withdraw', async () => {
+
+      // 100 per block farming rate starting at block 100 with all issuance ending on block 200
+      this.staking = await LaunchPoolStaking.new(
+        this.launchPoolToken.address,
+        to18DP('1000'), // 1k rewards = 10 rewards per block
+        this.startBlock.add(toBn('100')), // start mining block number
+        this.startBlock.add(toBn('200')), // end mining block number
+        {from: adminAlice}
+      );
+
+      // transfer tokens to launch pool so they can be allocation accordingly
+      await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
+
+      // add the first and only pool
+      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+
+      // Confirm reward per block
+      assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
+
+      // Deposit liquidity into pool
+      await this.xtp.approve(this.staking.address, '1000', {from: bob});
+      await this.staking.deposit(POOL_ZERO, '100', {from: bob});
+      await time.advanceBlockTo(this.startBlock.add(toBn('89')));
+
+      // trigger pool update before block reward started, ensure all zeros still
+      await this.staking.updatePool(POOL_ZERO, {from: bob}); // block 90
+      await checkRewards(POOL_ZERO, bob, '0', '0');
+
+      // Move into block 110 to trigger 10 block reward
+      await time.advanceBlockTo(this.startBlock.add(toBn('110')));
+      await this.staking.deposit(POOL_ZERO, '0', {from: bob}); // claim them rewards!
+      await checkRewards(POOL_ZERO, bob, '110', '10', true);
+
+      // move blocks on further
+      await time.advanceBlockTo(this.startBlock.add(toBn('150')));
+      await checkRewards(POOL_ZERO, bob, '110', '390', false);
+
+      // trigger the reactor meltdown
+      await this.staking.emergencyWithdraw(POOL_ZERO, {from: bob});
+
+      // check pending goes to zero after emergency shut down
+      await checkRewards(POOL_ZERO, bob, '110', '0', true);
+    });
+
+  });
+
   const checkRewards = async (pool, from, lptUserBalance, lptPendingBalance, updatePool = true) => {
     if (updatePool) {
       await this.staking.updatePool(pool, {from});
     }
-    assert.equal((await this.launchPoolToken.balanceOf(from)).toString(), to18DP(lptUserBalance));
-    assert.equal((await this.staking.pendingLpt(pool, from)).toString(), to18DP(lptPendingBalance));
+    assert.equal((await this.launchPoolToken.balanceOf(from)).toString(), to18DP(lptUserBalance).toString());
+    assert.equal((await this.staking.pendingLpt(pool, from)).toString(), to18DP(lptPendingBalance).toString());
   };
 
   const makeCoinAndSetupUsers = async (name, symbol) => {
@@ -357,31 +422,6 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
 
   const toBn = (value) => new BN(value);
 
-  // it('should allow emergency withdraw', async () => {
-  //   this.chef = await DeFiCasino.new(
-  //     this.deFiCasinoToken.address,
-  //     '100',
-  //     '100',
-  //     '1000',
-  //     whitelister,
-  //     {from: adminAlice}
-  //   );
-  //
-  //   await this.deFiCasinoToken.changeMinter(this.chef.address, {from: adminAlice});
-  //
-  //   await this.chef.whitelistStakingToken(this.xtp.address, '100', false, true, {from: adminAlice});
-  //   const stakeTokenInternalId = await this.chef.stakingTokenAddressToInternalId(this.xtp.address);
-  //
-  //   await this.xtp.approve(this.chef.address, '1000', {from: bob});
-  //
-  //   const bobsBalanceBeforeDeposit = await this.xtp.balanceOf(bob);
-  //   const depositAmount = new BN('100');
-  //   await this.chef.deposit(stakeTokenInternalId, depositAmount, referer, {from: bob});
-  //   (await this.xtp.balanceOf(bob)).should.be.bignumber.equal(bobsBalanceBeforeDeposit.sub(depositAmount));
-  //
-  //   await this.chef.emergencyWithdraw(stakeTokenInternalId, {from: bob});
-  //   (await this.xtp.balanceOf(bob)).should.be.bignumber.equal(bobsBalanceBeforeDeposit);
-  // });
 
   // it('should not distribute tokens if no one deposit', async () => {
   //   // 100 per block farming rate starting at block 200 with all issuance ending on block 300
