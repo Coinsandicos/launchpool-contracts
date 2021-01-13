@@ -8,3 +8,5 @@ cache/
 *.iml
 
 *.DS_Store
+coverage/
+coverage.json
