@@ -404,6 +404,78 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
 
   });
 
+  context('withdraw()', async () => {
+
+    beforeEach(async () => {
+      this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
+
+      // setup initial LP coin
+      this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP');
+
+      this.startBlock = await time.latestBlock();
+      console.log('Starting block', this.startBlock.toString());
+    });
+
+    it('fails to withdraw if you specify more than you own', async () => {
+
+      this.staking = await LaunchPoolStaking.new(
+        this.launchPoolToken.address,
+        to18DP('1000'), // 1k rewards = 10 rewards per block
+        this.startBlock.add(toBn('100')), // start mining block number
+        this.startBlock.add(toBn('200')), // end mining block number
+        {from: adminAlice}
+      );
+
+      // transfer tokens to launch pool so they can be allocation accordingly
+      await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
+
+      // add the first and only pool
+      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+
+      // stake some coins from bob
+      await this.xtp.approve(this.staking.address, '1000', {from: bob});
+      await this.staking.deposit(POOL_ZERO, '100', {from: bob});
+
+      await time.advanceBlockTo(this.startBlock.add(toBn('110')));
+
+      await expectRevert(
+        this.staking.withdraw(POOL_ZERO, '101', {from: bob}), // more than bob deposited
+        'withdraw: not good'
+      );
+    });
+
+    it('successfully withdraws if you specify to an amount you own to withdraw', async () => {
+
+      this.staking = await LaunchPoolStaking.new(
+        this.launchPoolToken.address,
+        to18DP('1000'), // 1k rewards = 10 rewards per block
+        this.startBlock.add(toBn('100')), // start mining block number
+        this.startBlock.add(toBn('200')), // end mining block number
+        {from: adminAlice}
+      );
+
+      // transfer tokens to launch pool so they can be allocation accordingly
+      await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
+
+      // add the first and only pool
+      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+
+      // stake some coins from bob
+      await this.xtp.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
+      await this.staking.deposit(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+
+      await time.advanceBlockTo(this.startBlock.add(toBn('110')));
+
+      assert.equal((await this.xtp.balanceOf(bob)).toString(), '0');
+
+      // withdraw all
+      await this.staking.withdraw(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+
+      assert.equal((await this.xtp.balanceOf(bob)).toString(), ONE_THOUSAND_TOKENS);
+    });
+
+  });
+
   const checkRewards = async (pool, from, lptUserBalance, lptPendingBalance, updatePool = true) => {
     if (updatePool) {
       await this.staking.updatePool(pool, {from});
