@@ -66,6 +66,10 @@ contract LaunchPoolStaking is Ownable {
         uint256 _startBlock,
         uint256 _endBlock
     ) public {
+        // FIXME require(endBlock > startBlock)
+        // FIXME require(rewardLimit > 0)
+        // FIXME require(_lpt != ZERO_ADDRESS)
+
         lpt = _lpt;
         rewardLimit = _rewardLimit;
         startBlock = _startBlock;
@@ -81,9 +85,16 @@ contract LaunchPoolStaking is Ownable {
     // Add a new lp to the pool. Can only be called by the owner.
     // XXX DO NOT add the same LP token more than once. Rewards will be messed up if you do.
     function add(uint256 _allocPoint, IERC20 _lpToken, bool _withUpdate) public onlyOwner {
+        // FIXME require(_allocPoint > 0)
+        // FIXME require(_lpToken != ZERO_ADDRESS)
+
+        // FIXME what if add are done after the end? Will this mess things up? Done by owner so shouldn't happen really
+        // require(block.number < endBlock);
+
         if (_withUpdate) {
             massUpdatePools();
         }
+        
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(PoolInfo({
@@ -96,6 +107,8 @@ contract LaunchPoolStaking is Ownable {
 
     // Update the given pool's allocation point. Can only be called by the owner.
     function set(uint256 _pid, uint256 _allocPoint, bool _withUpdate) public onlyOwner {
+        // FIXME require(_allocPoint > 0)
+
         if (_withUpdate) {
             massUpdatePools();
         }
@@ -115,9 +128,10 @@ contract LaunchPoolStaking is Ownable {
         uint256 accLptPerShare = pool.accLptPerShare;
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
-            uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
-            uint256 LptReward = multiplier.mul(lptPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-            accLptPerShare = accLptPerShare.add(LptReward.mul(1e18).div(lpSupply));
+            uint256 maxEndBlock = block.number <= endBlock ? block.number : endBlock;
+            uint256 multiplier = getMultiplier(pool.lastRewardBlock, maxEndBlock);
+            uint256 lptReward = multiplier.mul(lptPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+            accLptPerShare = accLptPerShare.add(lptReward.mul(1e18).div(lpSupply));
         }
         return user.amount.mul(accLptPerShare).div(1e18).sub(user.rewardDebt);
     }
@@ -141,10 +155,11 @@ contract LaunchPoolStaking is Ownable {
             pool.lastRewardBlock = block.number;
             return;
         }
-        uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number <= endBlock ? block.number : endBlock);
+        uint256 maxEndBlock = block.number <= endBlock ? block.number : endBlock;
+        uint256 multiplier = getMultiplier(pool.lastRewardBlock, maxEndBlock);
         uint256 lptReward = multiplier.mul(lptPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
         pool.accLptPerShare = pool.accLptPerShare.add(lptReward.mul(1e18).div(lpSupply));
-        pool.lastRewardBlock = block.number;
+        pool.lastRewardBlock = maxEndBlock;
     }
 
     // Deposit LP tokens to staking contract for LPT allocation.
@@ -155,7 +170,7 @@ contract LaunchPoolStaking is Ownable {
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.accLptPerShare).div(1e18).sub(user.rewardDebt);
             if (pending > 0) {
-                safeLPTTransfer(msg.sender, pending);
+                safeLptTransfer(msg.sender, pending);
             }
         }
         if (_amount > 0) {
@@ -174,7 +189,7 @@ contract LaunchPoolStaking is Ownable {
         updatePool(_pid);
         uint256 pending = user.amount.mul(pool.accLptPerShare).div(1e18).sub(user.rewardDebt);
         if (pending > 0) {
-            safeLPTTransfer(msg.sender, pending);
+            safeLptTransfer(msg.sender, pending);
         }
         if (_amount > 0) {
             user.amount = user.amount.sub(_amount);
@@ -198,7 +213,7 @@ contract LaunchPoolStaking is Ownable {
     // FIXME emergency LPT contract balance withdraw?
 
     // Safe LPT transfer function, just in case if rounding error causes pool to not have enough LPTs.
-    function safeLPTTransfer(address _to, uint256 _amount) internal {
+    function safeLptTransfer(address _to, uint256 _amount) internal {
         uint256 lptBal = lpt.balanceOf(address(this));
         if (_amount > lptBal) {
             lpt.transfer(_to, lptBal);
