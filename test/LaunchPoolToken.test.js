@@ -6,13 +6,32 @@ const LaunchPoolStaking = artifacts.require('LaunchPoolStaking');
 
 require('chai').should();
 
-const to18DP = (value) => {
-  return new BN(value).mul(new BN('10').pow(new BN('18')));
-};
-
 contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer, launchPoolAdmin, whitelister]) => {
+
+  const to18DP = (value) => {
+    return new BN(value).mul(new BN('10').pow(new BN('18')));
+  };
+
+  const toBn = (value) => new BN(value);
+
   const ONE_THOUSAND_TOKENS = to18DP('1000');
   const TEN_THOUSAND_TOKENS = to18DP('10000');
+
+  const makeCoinAndSetupUsers = async (name, symbol, from) => {
+    const coin = await MockERC20.new(name, symbol, ONE_THOUSAND_TOKENS.mul(new BN('4')), {from: from});
+    await coin.transfer(bob, ONE_THOUSAND_TOKENS, {from});
+    await coin.transfer(carol, ONE_THOUSAND_TOKENS, {from});
+    await coin.transfer(daniel, ONE_THOUSAND_TOKENS, {from});
+    return coin;
+  };
+
+  const checkRewards = async (pool, from, lptUserBalance, lptPendingBalance, updatePool = true) => {
+    if (updatePool) {
+      await this.staking.updatePool(pool, {from});
+    }
+    assert.equal((await this.launchPoolToken.balanceOf(from)).toString(), to18DP(lptUserBalance).toString());
+    assert.equal((await this.staking.pendingLpt(pool, from)).toString(), to18DP(lptPendingBalance).toString());
+  };
 
   const POOL_ZERO = new BN('0');
   const POOL_ONE = new BN('1');
@@ -49,9 +68,10 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
 
       // setup initial LP coin
-      this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP');
+      this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP', minter);
 
       this.startBlock = await time.latestBlock();
+
       console.log('Starting block', this.startBlock.toString());
     });
 
@@ -277,7 +297,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
 
       // Make another coin for the pool
-      this.xrp = await makeCoinAndSetupUsers('XRPPooCoin', 'XRP');
+      this.xrp = await makeCoinAndSetupUsers('XRPPooCoin', 'XRP', minter);
       await this.staking.add('50', this.xrp.address, true, {from: adminAlice});
 
       // check pool length now
@@ -351,7 +371,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
 
       // setup initial LP coin
-      this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP');
+      this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP', minter);
 
       this.startBlock = await time.latestBlock();
       console.log('Starting block', this.startBlock.toString());
@@ -410,7 +430,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
 
       // setup initial LP coin
-      this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP');
+      this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP', minter);
 
       this.startBlock = await time.latestBlock();
       console.log('Starting block', this.startBlock.toString());
@@ -466,239 +486,52 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
 
       await time.advanceBlockTo(this.startBlock.add(toBn('110')));
 
+      // sends pending but leaves stake
+      await this.staking.withdraw(POOL_ZERO, '0', {from: bob});
+
       assert.equal((await this.xtp.balanceOf(bob)).toString(), '0');
+      assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), to18DP('110'));
 
       // withdraw all
       await this.staking.withdraw(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
 
       assert.equal((await this.xtp.balanceOf(bob)).toString(), ONE_THOUSAND_TOKENS);
+      assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), to18DP('120')); // one more block passed
+    });
+
+    it('successfully withdraws pending rewards and stake if you specify to an amount you own to withdraw', async () => {
+
+      this.staking = await LaunchPoolStaking.new(
+        this.launchPoolToken.address,
+        to18DP('1000'), // 1k rewards = 10 rewards per block
+        this.startBlock.add(toBn('100')), // start mining block number
+        this.startBlock.add(toBn('200')), // end mining block number
+        {from: adminAlice}
+      );
+
+      // transfer tokens to launch pool so they can be allocation accordingly
+      await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
+
+      // add the first and only pool
+      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+
+      // stake some coins from bob
+      await this.xtp.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
+      await this.staking.deposit(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+
+      await time.advanceBlockTo(this.startBlock.add(toBn('110')));
+
+      assert.equal((await this.xtp.balanceOf(bob)).toString(), '0');
+      assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), '0');
+
+      // withdraw all
+      await this.staking.withdraw(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+
+      assert.equal((await this.xtp.balanceOf(bob)).toString(), ONE_THOUSAND_TOKENS);
+      assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), to18DP('110'));
     });
 
   });
-
-  const checkRewards = async (pool, from, lptUserBalance, lptPendingBalance, updatePool = true) => {
-    if (updatePool) {
-      await this.staking.updatePool(pool, {from});
-    }
-    assert.equal((await this.launchPoolToken.balanceOf(from)).toString(), to18DP(lptUserBalance).toString());
-    assert.equal((await this.staking.pendingLpt(pool, from)).toString(), to18DP(lptPendingBalance).toString());
-  };
-
-  const makeCoinAndSetupUsers = async (name, symbol) => {
-    const coin = await MockERC20.new(name, symbol, ONE_THOUSAND_TOKENS.mul(new BN('4')), {from: minter});
-    await coin.transfer(bob, ONE_THOUSAND_TOKENS, {from: minter});
-    await coin.transfer(carol, ONE_THOUSAND_TOKENS, {from: minter});
-    await coin.transfer(daniel, ONE_THOUSAND_TOKENS, {from: minter});
-    return coin;
-  };
-
-  const toBn = (value) => new BN(value);
-
-
-  // it('should not distribute tokens if no one deposit', async () => {
-  //   // 100 per block farming rate starting at block 200 with all issuance ending on block 300
-  //   this.chef = await DeFiCasino.new(
-  //     this.deFiCasinoToken.address,
-  //     TEN_THOUSAND_TOKENS, //mint limit
-  //     '200', // start mining
-  //     '300', // end mining
-  //     whitelister,
-  //     {from: adminAlice}
-  //   );
-  //
-  //   await this.deFiCasinoToken.changeMinter(this.chef.address, {from: adminAlice});
-  //
-  //   await this.chef.whitelistStakingToken(this.xtp.address, '100', false, true, {from: adminAlice});
-  //   const stakeTokenInternalId = await this.chef.stakingTokenAddressToInternalId(this.xtp.address);
-  //
-  //   await time.advanceBlockTo('199');
-  //   assert.equal((await this.chef.rewardTokensAccrued()).toString(), '0');
-  //
-  //   await time.advanceBlockTo('204');
-  //   assert.equal((await this.chef.rewardTokensAccrued()).toString(), '0');
-  //
-  //   await this.xtp.approve(this.chef.address, ONE_THOUSAND_TOKENS, {from: bob});
-  //   await time.advanceBlockTo('209');
-  //   const depositAmount = new BN('10');
-  //   await this.chef.deposit(stakeTokenInternalId, depositAmount, referer, {from: bob}); // block 210
-  //
-  //   assert.equal((await this.chef.rewardTokensAccrued()).toString(), '0');
-  //   assert.equal((await this.deFiCasinoToken.balanceOf(bob)).toString(), '0');
-  //   assert.equal((await this.deFiCasinoToken.balanceOf(dev)).toString(), '0');
-  //   (await this.xtp.balanceOf(bob)).should.be.bignumber.equal(ONE_THOUSAND_TOKENS.sub(depositAmount));
-  //
-  //   await time.advanceBlockTo('219');
-  //   await this.chef.withdraw(stakeTokenInternalId, depositAmount, {from: bob}); // block 220
-  //
-  //   (await this.chef.rewardTokensAccrued()).should.be.bignumber.equal(ONE_THOUSAND_TOKENS);
-  //   (await this.deFiCasinoToken.balanceOf(bob)).should.be.bignumber.equal(ONE_THOUSAND_TOKENS.div(new BN('100')).mul(new BN('80')));
-  //   (await this.deFiCasinoToken.balanceOf(referer)).should.be.bignumber.equal(ONE_THOUSAND_TOKENS.div(new BN('100')).mul(new BN('20')));
-  //   (await this.xtp.balanceOf(bob)).should.be.bignumber.equal(ONE_THOUSAND_TOKENS);
-  //
-  //   // all 1k tokens accrued will have been withdrawn so chef should have nothing
-  //   (await this.deFiCasinoToken.balanceOf(this.chef.address)).should.be.bignumber.equal('0');
-  // });
-  //
-  // it('should distribute tokens properly for each staker', async () => {
-  //   // 100 per block farming rate starting at block 300 with all issuance ending on block 400
-  //   this.chef = await DeFiCasino.new(
-  //     this.deFiCasinoToken.address,
-  //     TEN_THOUSAND_TOKENS,
-  //     '300',
-  //     '400',
-  //     whitelister,
-  //     {from: adminAlice}
-  //   );
-  //
-  //   await this.deFiCasinoToken.changeMinter(this.chef.address, {from: adminAlice});
-  //
-  //   await this.chef.whitelistStakingToken(this.xtp.address, '100', false, true, {from: adminAlice});
-  //   const stakeTokenInternalId = await this.chef.stakingTokenAddressToInternalId(this.xtp.address);
-  //
-  //   await this.xtp.approve(this.chef.address, ONE_THOUSAND_TOKENS, {from: adminAlice});
-  //   await this.xtp.approve(this.chef.address, ONE_THOUSAND_TOKENS, {from: bob});
-  //   await this.xtp.approve(this.chef.address, ONE_THOUSAND_TOKENS, {from: carol});
-  //
-  //   // Alice deposits 10 LPs at block 310
-  //   await time.advanceBlockTo('309');
-  //   const aliceFirstDeposit = to18DP('100');
-  //   await this.chef.deposit(stakeTokenInternalId, aliceFirstDeposit, referer, {from: adminAlice});
-  //
-  //   // Bob deposits 20 LPs at block 314
-  //   await time.advanceBlockTo('313');
-  //   const bobFirstDeposit = to18DP('200');
-  //   await this.chef.deposit(stakeTokenInternalId, bobFirstDeposit, referer, {from: bob});
-  //
-  //   // at block 314, 400 tokens will have been issued - all which should be due to adminAlice
-  //   const FOUR_HUNDRED = to18DP('400');
-  //   assert.equal((await this.chef.rewardTokensAccrued()).toString(), FOUR_HUNDRED);
-  //
-  //   // Carol deposits 30 LPs at block 318
-  //   await time.advanceBlockTo('317');
-  //   const carolFirstDeposit = to18DP('300');
-  //   await this.chef.deposit(stakeTokenInternalId, carolFirstDeposit, referer, {from: carol});
-  //
-  //   assert.equal((await this.chef.rewardTokensAccrued()).toString(), FOUR_HUNDRED.mul(new BN('2')));
-  //
-  //   (await this.deFiCasinoToken.balanceOf(this.chef.address)).should.be.bignumber.equal(FOUR_HUNDRED.mul(new BN('2')));
-  //
-  //   // Alice deposits 10 more LPs at block 320.
-  //   await time.advanceBlockTo('319');
-  //   const aliceSecondDeposit = to18DP('100');
-  //   await this.chef.deposit(stakeTokenInternalId, aliceSecondDeposit, referer, {from: adminAlice});
-  //
-  //   assert.equal((await this.chef.rewardTokensAccrued()).toString(), ONE_THOUSAND_TOKENS);
-  //
-  //   //As of block #320:
-  //   //   Alice should have:
-  //   //     - from the first 4 blocks (#314 - when bob deposits): 4 blocks * 100 reward per block = 400
-  //   //     - from the next 4 blocks (#318 - when carol deposits): 4 * 1/3 * 100 (1/3 of the share of the reward token based on deposits thus far) = 133.33
-  //   //     - block #320 when Alice adds 10 more LPs: 2 * 1/6 * 100 = 33.33
-  //   //     - total = 400 + 133.33 + 33.33
-  //   //     HOWEVER, Alice only gets 80% of the total vs 20% for her referer
-  //   const TWO_HUNDRED = to18DP('200');
-  //   const first4BlockReward = FOUR_HUNDRED;
-  //   const next4BlockReward = FOUR_HUNDRED.div(new BN('3'));
-  //   const next2BlockReward = TWO_HUNDRED.div(new BN('6'));
-  //   const aliceTotal = first4BlockReward.add(next4BlockReward).add(next2BlockReward);
-  //   const aliceTotalMinusReferralShare = aliceTotal.div(new BN('100')).mul(new BN('80'));
-  //   const referralShare = aliceTotal.div(new BN('100')).mul(new BN('20'));
-  //
-  //   (await this.deFiCasinoToken.balanceOf(adminAlice)).should.be.bignumber.equal(aliceTotalMinusReferralShare);
-  //   (await this.deFiCasinoToken.balanceOf(referer)).should.be.bignumber.equal(referralShare);
-  //
-  //   assert.equal((await this.deFiCasinoToken.balanceOf(bob)).toString(), '0');
-  //   assert.equal((await this.deFiCasinoToken.balanceOf(carol)).toString(), '0');
-  //
-  //   (await this.deFiCasinoToken.balanceOf(this.chef.address)).should.be.bignumber.equal(ONE_THOUSAND_TOKENS.sub(aliceTotalMinusReferralShare.add(referralShare)));
-  //
-  //   // Bob withdraws 5 LPs at block 330. At this point:
-  //   //   Bob should have: 4 * 2/3 * 100 + 2 * 2/6 * 100 + 10 * 2/7 * 100
-  //   await time.advanceBlockTo('329');
-  //   const bobFirstWithdrawal = to18DP('5');
-  //   await this.chef.withdraw(stakeTokenInternalId, bobFirstWithdrawal, {from: bob});
-  //
-  //   (await this.chef.rewardTokensAccrued()).should.be.bignumber.equal(ONE_THOUSAND_TOKENS.mul(new BN('2')));
-  //   (await this.deFiCasinoToken.balanceOf(adminAlice)).should.be.bignumber.equal(aliceTotalMinusReferralShare);
-  //
-  //   //   Bob should have: 4 * 2/3 * 100 + 2 * 2/6 * 100 + 10 * 2/7 * 100
-  //   const firstRewardBob = FOUR_HUNDRED.mul(new BN('2')).div(new BN('3'));
-  //   const secondRewardBob = TWO_HUNDRED.div(new BN('3'));
-  //   const thirdRewardBob = ONE_THOUSAND_TOKENS.mul(new BN('2')).div(new BN('7'));
-  //   const bobTotalReward = firstRewardBob.add(secondRewardBob).add(thirdRewardBob);
-  //   //(await this.deFiCasinoToken.balanceOf(bob)).should.be.bignumber.equal(bobTotalReward);
-  //
-  //   assert.equal((await this.deFiCasinoToken.balanceOf(carol)).toString(), '0');
-  //   // assert.equal((await this.deFiCasinoToken.balanceOf(this.chef.address)).toString(), '8815');
-  //   //
-  //   // // Alice withdraws 20 LPs at block 340.
-  //   // // Bob withdraws 15 LPs at block 350.
-  //   // // Carol withdraws 30 LPs at block 360.
-  //   // await time.advanceBlockTo('339');
-  //   // await this.chef.withdraw('20', {from: adminAlice});
-  //   // await time.advanceBlockTo('349');
-  //   // await this.chef.withdraw('15', {from: bob});
-  //   // await time.advanceBlockTo('359');
-  //   // await this.chef.withdraw('30', {from: carol});
-  //   //
-  //   // assert.equal((await this.chef.rewardTokensAccrued()).toString(), '5000');
-  //   //
-  //   // // FIXME rounding error? 1 wei out?
-  //   // assert.equal((await this.deFiCasinoToken.balanceOf(this.chef.address)).toString(), '5001');
-  //   //
-  //   // // Alice should have: 566 + (10 * 2/7 * 100)+ (10 * 2/6.5 * 100) = 1159
-  //   // assert.equal((await this.deFiCasinoToken.balanceOf(adminAlice)).toString(), '1159');
-  //   //
-  //   // // Bob should have: 619 + (10 * 1.5/6.5 * 100) + (10 * 1.5/4.5 * 100) = 1183
-  //   // assert.equal((await this.deFiCasinoToken.balanceOf(bob)).toString(), '1183');
-  //   //
-  //   // // Carol should have: (2* 3/6 *100) + (10* 3/7 *100) + (10* 3/6.5 *100) + (10* 3/4.5 *100) + 10*100 = 2657
-  //   // assert.equal((await this.deFiCasinoToken.balanceOf(carol)).valueOf(), '2657');
-  //   //
-  //   // // FIXME rounding error? 1 wei out?
-  //   // assert.equal(1159 + 1183 + 2657, 4999);
-  //   //
-  //   // // All of them should have 1000 LPs back.
-  //   // assert.equal((await this.xtp.balanceOf(adminAlice)).valueOf(), '1000');
-  //   // assert.equal((await this.xtp.balanceOf(bob)).valueOf(), '1000');
-  //   // assert.equal((await this.xtp.balanceOf(carol)).valueOf(), '1000');
-  // });
-  //
-  // it('should stop giving bonus tokens after the end of the farming period', async () => {
-  //   // 100 token block reward starting at block 500 and finishing at block 600
-  //   this.chef = await DeFiCasino.new(
-  //     this.deFiCasinoToken.address,
-  //     '10000',
-  //     '500',
-  //     '600',
-  //     whitelister,
-  //     {from: adminAlice}
-  //   );
-  //
-  //   await this.deFiCasinoToken.changeMinter(this.chef.address, {from: adminAlice});
-  //
-  //   await this.chef.whitelistStakingToken(this.xtp.address, '100', false, true,{from: adminAlice});
-  //   const stakeTokenInternalId = await this.chef.stakingTokenAddressToInternalId(this.xtp.address);
-  //
-  //   // Alice deposits 10 LPs at block 590
-  //   await this.xtp.approve(this.chef.address, '1000', {from: adminAlice});
-  //   await time.advanceBlockTo('589');
-  //   await this.chef.deposit(stakeTokenInternalId, '10', referer, {from: adminAlice});
-  //
-  //   // At block 605, she should have 10 blocks * 100 token per block reward = 1000 pending.
-  //   await time.advanceBlockTo('605');
-  //   const {
-  //     _userRewards,
-  //     _referrerRewards
-  //   } = await this.chef.pendingRewards(stakeTokenInternalId, adminAlice);
-  //   assert.equal(_userRewards.toString(), '800');
-  //   assert.equal(_referrerRewards.toString(), '200');
-  //
-  //   // At block 606, Alice withdraws all pending rewards and should get 1000 tokens (no more than block 605 as token rewards ended on block 600).
-  //   await this.chef.harvest(stakeTokenInternalId, {from: adminAlice});
-  //   assert.equal((await this.chef.pendingRewards(stakeTokenInternalId, adminAlice))._userRewards.toString(), '0');
-  //   assert.equal((await this.deFiCasinoToken.balanceOf(adminAlice)).toString(), '800');
-  // });
 
   describe('owner functions', () => {
 
@@ -708,7 +541,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
     beforeEach(async () => {
       this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
 
-      this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP');
+      this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP', minter);
 
       this.staking = await LaunchPoolStaking.new(
         this.launchPoolToken.address,
@@ -717,6 +550,9 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
         endBlock,
         {from: adminAlice}
       );
+
+      // add the first and only pool
+      await this.staking.add('100', this.xtp.address, false, {from: adminAlice});
     });
 
     it('can not "add" if not owner', async () => {
@@ -731,6 +567,20 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
         this.staking.set(POOL_ZERO, '100', true, {from: bob}),
         'Ownable: caller is not the owner'
       );
+    });
+
+    it('can "set" if owner (with update)', async () => {
+      assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '100'); // allocPoint
+
+      await this.staking.set(POOL_ZERO, '500', true, {from: adminAlice});
+      assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '500'); // allocPoint
+    });
+
+    it('can "set" if owner (without update)', async () => {
+      assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '100'); // allocPoint
+
+      await this.staking.set(POOL_ZERO, '500', false, {from: adminAlice});
+      assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '500'); // allocPoint
     });
   });
 });
