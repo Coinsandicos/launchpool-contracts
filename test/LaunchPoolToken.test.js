@@ -90,7 +90,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
 
       // add the first and only pool
-      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+      await this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
 
       // Confirm reward per block
       assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
@@ -153,7 +153,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
 
       // add the first and only pool
-      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+      await this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
 
       // Confirm reward per block
       assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
@@ -223,7 +223,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
 
       // add the first and only pool
-      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+      await this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
 
       // Confirm reward per block
       assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
@@ -294,11 +294,11 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
 
       // add the first pool
-      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+      await this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
 
       // Make another coin for the pool
       this.xrp = await makeCoinAndSetupUsers('XRPPooCoin', 'XRP', minter);
-      await this.staking.add('50', this.xrp.address, true, {from: adminAlice});
+      await this.staking.add('50', this.xrp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
 
       // check pool length now
       assert.equal((await this.staking.poolLength()).toString(), '2');
@@ -363,6 +363,37 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
     it('should issue reward tokens correctly with 2 people in 2 pools with different allocations in each', async () => {
       // TODO
     });
+
+    it('should reverts if exceeded token cap for deposits', async () => {
+
+      // 100 per block farming rate starting at block 100 with all issuance ending on block 200
+      this.staking = await LaunchPoolStaking.new(
+        this.launchPoolToken.address,
+        to18DP('1000'), // 1k rewards = 10 rewards per block
+        this.startBlock.add(toBn('100')), // start mining block number
+        this.startBlock.add(toBn('200')), // end mining block number
+        {from: adminAlice}
+      );
+
+      // transfer tokens to launch pool so they can be allocation accordingly
+      await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
+
+      // add the first and only pool with a 500 token cap per account!
+      await this.staking.add('100', this.xtp.address, to18DP('500'), true, {from: adminAlice});
+
+      // Deposit liquidity into pool
+      await this.xtp.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
+      await this.staking.deposit(POOL_ZERO, to18DP('250'), {from: bob});
+
+      // at token cap
+      await this.staking.deposit(POOL_ZERO, to18DP('250'), {from: bob});
+
+      // exceeds
+      await expectRevert(
+        this.staking.deposit(POOL_ZERO, to18DP('1'), {from: bob}), // more than token cap
+        'deposit: can not exceed pool token cap'
+      );
+    });
   });
 
   context('emergencyWithdraw()', async () => {
@@ -392,7 +423,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
 
       // add the first and only pool
-      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+      await this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
 
       // Confirm reward per block
       assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
@@ -450,7 +481,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
 
       // add the first and only pool
-      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+      await this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
 
       // stake some coins from bob
       await this.xtp.approve(this.staking.address, '1000', {from: bob});
@@ -460,7 +491,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
 
       await expectRevert(
         this.staking.withdraw(POOL_ZERO, '101', {from: bob}), // more than bob deposited
-        'withdraw: not good'
+        'withdraw: _amount not good'
       );
     });
 
@@ -478,7 +509,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
 
       // add the first and only pool
-      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+      await this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
 
       // stake some coins from bob
       await this.xtp.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
@@ -513,7 +544,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
 
       // add the first and only pool
-      await this.staking.add('100', this.xtp.address, true, {from: adminAlice});
+      await this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
 
       // stake some coins from bob
       await this.xtp.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
@@ -533,6 +564,33 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
 
   });
 
+  describe('requires', () => {
+    it('reverts if call pendingLpt with incorrect PID', async () => {
+
+      this.staking = await LaunchPoolStaking.new(
+        this.launchPoolToken.address,
+        to18DP('1000'), // 1k rewards = 10 rewards per block
+        this.startBlock.add(toBn('100')), // start mining block number
+        this.startBlock.add(toBn('200')), // end mining block number
+        {from: adminAlice}
+      );
+
+      // transfer tokens to launch pool so they can be allocation accordingly
+      await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
+
+      // add the first and only pool
+      await this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
+
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob, {from: bob})).toString(), '0');
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, carol, {from: bob})).toString(), '0');
+
+      await expectRevert(
+        this.staking.pendingLpt(POOL_ONE, bob, {from: bob}),
+        'pendingLpt: invalid _pid'
+      );
+    });
+  });
+
   describe('owner functions', () => {
 
     const startBlock = '0';
@@ -546,25 +604,25 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       this.staking = await LaunchPoolStaking.new(
         this.launchPoolToken.address,
         rewardLimit,
-        startBlock,
-        endBlock,
+        this.startBlock.add(toBn('100')), // start mining block number
+        this.startBlock.add(toBn('200')), // end mining block number
         {from: adminAlice}
       );
 
       // add the first and only pool
-      await this.staking.add('100', this.xtp.address, false, {from: adminAlice});
+      await this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, false, {from: adminAlice});
     });
 
     it('can not "add" if not owner', async () => {
       await expectRevert(
-        this.staking.add('100', this.xtp.address, true, {from: bob}),
+        this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: bob}),
         'Ownable: caller is not the owner'
       );
     });
 
     it('can not "set" if not owner', async () => {
       await expectRevert(
-        this.staking.set(POOL_ZERO, '100', true, {from: bob}),
+        this.staking.set(POOL_ZERO, '100', ONE_THOUSAND_TOKENS, true, {from: bob}),
         'Ownable: caller is not the owner'
       );
     });
@@ -572,14 +630,14 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
     it('can "set" if owner (with update)', async () => {
       assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '100'); // allocPoint
 
-      await this.staking.set(POOL_ZERO, '500', true, {from: adminAlice});
+      await this.staking.set(POOL_ZERO, '500', ONE_THOUSAND_TOKENS, true, {from: adminAlice});
       assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '500'); // allocPoint
     });
 
     it('can "set" if owner (without update)', async () => {
       assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '100'); // allocPoint
 
-      await this.staking.set(POOL_ZERO, '500', false, {from: adminAlice});
+      await this.staking.set(POOL_ZERO, '500', ONE_THOUSAND_TOKENS, false, {from: adminAlice});
       assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '500'); // allocPoint
     });
   });
