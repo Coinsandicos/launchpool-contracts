@@ -54,7 +54,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       {from: adminAlice}
     );
 
-    (await this.staking.rewardLimit()).should.be.bignumber.equal(rewardLimit);
+    (await this.staking.maxLPTAvailableForFarming()).should.be.bignumber.equal(rewardLimit);
     (await this.staking.startBlock()).should.be.bignumber.equal(startBlock);
     (await this.staking.endBlock()).should.be.bignumber.equal(endBlock);
 
@@ -301,7 +301,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       await this.staking.add('50', this.xrp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
 
       // check pool length now
-      assert.equal((await this.staking.poolLength()).toString(), '2');
+      assert.equal((await this.staking.numOfFarms()).toString(), '2');
 
       // Deposit liquidity into pool 0
       await this.xtp.approve(this.staking.address, '1000', {from: bob});
@@ -391,7 +391,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       // exceeds
       await expectRevert(
         this.staking.deposit(POOL_ZERO, to18DP('1'), {from: bob}), // more than token cap
-        'deposit: can not exceed pool token cap'
+        'deposit: can not exceed farm token cap'
       );
     });
   });
@@ -628,17 +628,17 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
     });
 
     it('can "set" if owner (with update)', async () => {
-      assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '100'); // allocPoint
+      assert.equal((await this.staking.farmInfo(POOL_ZERO))[1].toString(), '100'); // allocPoint
 
       await this.staking.set(POOL_ZERO, '500', ONE_THOUSAND_TOKENS, true, {from: adminAlice});
-      assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '500'); // allocPoint
+      assert.equal((await this.staking.farmInfo(POOL_ZERO))[1].toString(), '500'); // allocPoint
     });
 
     it('can "set" if owner (without update)', async () => {
-      assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '100'); // allocPoint
+      assert.equal((await this.staking.farmInfo(POOL_ZERO))[1].toString(), '100'); // allocPoint
 
       await this.staking.set(POOL_ZERO, '500', ONE_THOUSAND_TOKENS, false, {from: adminAlice});
-      assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '500'); // allocPoint
+      assert.equal((await this.staking.farmInfo(POOL_ZERO))[1].toString(), '500'); // allocPoint
     });
   });
 });
