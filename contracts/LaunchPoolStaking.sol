@@ -10,9 +10,9 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import "./LaunchPoolToken.sol";
 
-/// @title Staking contract for farming LPT rewards in return for staking a number of whitelisted LP tokens
+/// @title Staking contract for farming LPT rewards in return for staking a whitelisted token(s)
 /// @author BlockRocket.tech
-/// @notice Based on MasterChef.sol from SushiSwap
+/// @notice Fork of MasterChef.sol from SushiSwap
 /// @dev Only the owner can add new farms
 contract LaunchPoolStaking is Ownable {
     using SafeMath for uint256;
@@ -20,7 +20,7 @@ contract LaunchPoolStaking is Ownable {
 
     /// @dev Details about each user in a pool
     struct UserInfo {
-        uint256 amount;     // How many LP tokens the user has provided to a pool
+        uint256 amount;     // How many tokens the user has provided to a pool
         uint256 rewardDebt; // Reward debt. See explanation below.
         //
         // We do some fancy math here. Basically, any point in time, the amount of LPTs
@@ -37,14 +37,14 @@ contract LaunchPoolStaking is Ownable {
 
     /// @dev Info of each farm.
     struct FarmInfo {
-        IERC20 lpToken;           // Address of LP token contract.
-        uint256 allocPoint;       // How many allocation points assigned to this pool. Essentially percentage of total LPT
-        uint256 lastRewardBlock;  // Last block number that LPT distribution has occurred up to endBlock.
+        IERC20 erc20Token; // Address of token contract.
+        uint256 allocPoint; // How many allocation points assigned to this pool; this is a weighting for rewards.
+        uint256 lastRewardBlock; // Last block number that LPT distribution has occurred up to endBlock.
         uint256 accLptPerShare; // Per LP token staked, how much LPT earned in pool that users will get
-        uint256 maxStakingAmountPerUser; // Max. amount of tokens that can be staked per account
+        uint256 maxStakingAmountPerUser; // Max. amount of tokens that can be staked per account/user
     }
 
-    /// @notice The reward token - $LPT
+    /// @notice The reward token aka $LPT
     LaunchPoolToken public lpt;
 
     /// @notice Number of LPT tokens distributed per block, across all pools.
@@ -69,8 +69,8 @@ contract LaunchPoolStaking is Ownable {
     /// @notice The block number when rewards ends.
     uint256 public endBlock;
 
-    /// @notice Tracks LP tokens added by owner
-    mapping(address => bool) isLPTokenWhitelisted;
+    /// @notice Tracks ERC20 tokens added by owner
+    mapping(address => bool) isErc20TokenWhitelisted;
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
@@ -101,22 +101,22 @@ contract LaunchPoolStaking is Ownable {
 
     /// @notice Returns the number of farms that have been added by the owner
     /// @return Number of farms
-    function numOfFarms() external view returns (uint256) {
+    function numberOfFarms() external view returns (uint256) {
         return farmInfo.length;
     }
 
     /// @notice Create a new LPT farm by whitelisting a new LP token.
     /// @dev Can only be called by the contract owner
     /// @param _allocPoint Governs what percentage of the total LPT rewards this farm and other farms will get
-    /// @param _lpToken Address of the staking token being whitelisted
+    /// @param _erc20Token Address of the staking token being whitelisted
     /// @param _maxStakingAmountPerUser For this farm, maximum amount per user that can be staked
     /// @param _withUpdate Set to true for updating all farms before adding this one
-    function add(uint256 _allocPoint, IERC20 _lpToken, uint256 _maxStakingAmountPerUser, bool _withUpdate) public onlyOwner {
+    function add(uint256 _allocPoint, IERC20 _erc20Token, uint256 _maxStakingAmountPerUser, bool _withUpdate) public onlyOwner {
         require(block.number < endBlock, "add: must be before end");
-
-        address lpTokenAddress = address(_lpToken);
-        require(lpTokenAddress != address(0), "add: _lpToken must not be zero address");
-        require(isLPTokenWhitelisted[lpTokenAddress] == false, "add: already whitelisted");
+        address erc20TokenAddress = address(_erc20Token);
+        require(erc20TokenAddress != address(0), "add: _erc20Token must not be zero address");
+        require(isErc20TokenWhitelisted[erc20TokenAddress] == false, "add: already whitelisted");
+        require(_maxStakingAmountPerUser > 0, "add: _maxStakingAmountPerUser must be greater than zero");
 
         if (_withUpdate) {
             massUpdatePools();
@@ -125,14 +125,14 @@ contract LaunchPoolStaking is Ownable {
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         farmInfo.push(FarmInfo({
-            lpToken : _lpToken,
+            erc20Token : _erc20Token,
             allocPoint : _allocPoint,
             lastRewardBlock : lastRewardBlock,
             accLptPerShare : 0,
             maxStakingAmountPerUser: _maxStakingAmountPerUser
         }));
 
-        isLPTokenWhitelisted[lpTokenAddress] = true;
+        isErc20TokenWhitelisted[erc20TokenAddress] = true;
     }
 
     /// @notice Update a farm's allocation point to increase or decrease its share of contract-level rewards
@@ -145,6 +145,7 @@ contract LaunchPoolStaking is Ownable {
     function set(uint256 _pid, uint256 _allocPoint, uint256 _maxStakingAmountPerUser, bool _withUpdate) public onlyOwner {
         require(block.number < endBlock, "set: must be before end");
         require(_pid < farmInfo.length, "set: invalid _pid");
+        require(_maxStakingAmountPerUser > 0, "set: _maxStakingAmountPerUser must be greater than zero");
 
         if (_withUpdate) {
             massUpdatePools();
@@ -167,7 +168,7 @@ contract LaunchPoolStaking is Ownable {
         UserInfo storage user = userInfo[_pid][_user];
 
         uint256 accLptPerShare = farm.accLptPerShare;
-        uint256 lpSupply = farm.lpToken.balanceOf(address(this));
+        uint256 lpSupply = farm.erc20Token.balanceOf(address(this));
 
         if (block.number > farm.lastRewardBlock && lpSupply != 0) {
             uint256 maxEndBlock = block.number <= endBlock ? block.number : endBlock;
@@ -197,7 +198,7 @@ contract LaunchPoolStaking is Ownable {
             return;
         }
 
-        uint256 lpSupply = farm.lpToken.balanceOf(address(this));
+        uint256 lpSupply = farm.erc20Token.balanceOf(address(this));
         if (lpSupply == 0) {
             farm.lastRewardBlock = block.number;
             return;
@@ -236,7 +237,7 @@ contract LaunchPoolStaking is Ownable {
         }
 
         if (_amount > 0) {
-            farm.lpToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+            farm.erc20Token.safeTransferFrom(address(msg.sender), address(this), _amount);
             user.amount = user.amount.add(_amount);
         }
 
@@ -263,7 +264,7 @@ contract LaunchPoolStaking is Ownable {
 
         if (_amount > 0) {
             user.amount = user.amount.sub(_amount);
-            farm.lpToken.safeTransfer(address(msg.sender), _amount);
+            farm.erc20Token.safeTransfer(address(msg.sender), _amount);
         }
 
         user.rewardDebt = user.amount.mul(farm.accLptPerShare).div(1e18);
@@ -282,7 +283,7 @@ contract LaunchPoolStaking is Ownable {
         user.amount = 0;
         user.rewardDebt = 0;
 
-        farm.lpToken.safeTransfer(address(msg.sender), amount);
+        farm.erc20Token.safeTransfer(address(msg.sender), amount);
         emit EmergencyWithdraw(msg.sender, _pid, amount);
     }
 
@@ -291,7 +292,7 @@ contract LaunchPoolStaking is Ownable {
     ////////////
 
     /// @dev Safe LPT transfer function, just in case if rounding error causes farm to not have enough LPTs.
-    /// @param _to Who to send LPT into
+    /// @param _to Whom to send LPT into
     /// @param _amount of LPT to send
     function safeLptTransfer(address _to, uint256 _amount) private {
         uint256 lptBal = lpt.balanceOf(address(this));

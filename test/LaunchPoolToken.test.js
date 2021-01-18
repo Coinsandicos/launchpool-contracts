@@ -63,6 +63,51 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
   });
 
   context('With one token added to the staking pools', () => {
+    it('revert if rewards token address is zero', async () => {
+      await expectRevert(
+        LaunchPoolStaking.new(
+          constants.ZERO_ADDRESS,
+          rewardLimit,
+          0,
+          1,
+          {from: adminAlice}
+        ),
+        'constructor: _lpt must not be zero address'
+      );
+    });
+
+    it('revert if end before start', async () => {
+
+      this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
+      await expectRevert(
+        LaunchPoolStaking.new(
+          this.launchPoolToken.address,
+          rewardLimit,
+          2,
+          1,
+          {from: adminAlice}
+        ),
+        'constructor: end must be after start'
+      );
+    });
+
+    it('revert if reward limit is zero', async () => {
+
+      this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
+      await expectRevert(
+        LaunchPoolStaking.new(
+          this.launchPoolToken.address,
+          0,
+          1,
+          2,
+          {from: adminAlice}
+        ),
+        'constructor: _maxLPTAvailableForFarming must be greater than zero'
+      );
+    });
+  });
+
+  context('With one token added to the staking pools', () => {
 
     beforeEach(async () => {
       this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
@@ -301,7 +346,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       await this.staking.add('50', this.xrp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
 
       // check pool length now
-      assert.equal((await this.staking.numOfFarms()).toString(), '2');
+      assert.equal((await this.staking.numberOfFarms()).toString(), '2');
 
       // Deposit liquidity into pool 0
       await this.xtp.approve(this.staking.address, '1000', {from: bob});
@@ -453,6 +498,34 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       await checkRewards(POOL_ZERO, bob, '110', '0', true);
     });
 
+    it('should revert emergency withdraw with invalid pid', async () => {
+
+      // 100 per block farming rate starting at block 100 with all issuance ending on block 200
+      this.staking = await LaunchPoolStaking.new(
+        this.launchPoolToken.address,
+        to18DP('1000'), // 1k rewards = 10 rewards per block
+        this.startBlock.add(toBn('100')), // start mining block number
+        this.startBlock.add(toBn('200')), // end mining block number
+        {from: adminAlice}
+      );
+
+      // transfer tokens to launch pool so they can be allocation accordingly
+      await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
+
+      // add the first and only pool
+      await this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
+
+      // Deposit liquidity into pool
+      await this.xtp.approve(this.staking.address, '1000', {from: bob});
+      await this.staking.deposit(POOL_ZERO, '100', {from: bob});
+      await time.advanceBlockTo(this.startBlock.add(toBn('89')));
+
+      //  ooops
+      await expectRevert(
+        this.staking.emergencyWithdraw(POOL_ONE, {from: bob}),
+        'updatePool: invalid _pid'
+      );
+    });
   });
 
   context('withdraw()', async () => {
@@ -589,6 +662,28 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
         'pendingLpt: invalid _pid'
       );
     });
+
+    it('reverts if call update pool with incorrect PID', async () => {
+
+      this.staking = await LaunchPoolStaking.new(
+        this.launchPoolToken.address,
+        to18DP('1000'), // 1k rewards = 10 rewards per block
+        this.startBlock.add(toBn('100')), // start mining block number
+        this.startBlock.add(toBn('200')), // end mining block number
+        {from: adminAlice}
+      );
+
+      // transfer tokens to launch pool so they can be allocation accordingly
+      await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
+
+      // add the first and only pool
+      await this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
+
+      await expectRevert(
+        this.staking.updatePool(POOL_ONE, {from: bob}),
+        'updatePool: invalid _pid'
+      );
+    });
   });
 
   describe('owner functions', () => {
@@ -620,10 +715,38 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       );
     });
 
+    it('can not "add" if token is zero address', async () => {
+      await expectRevert(
+        this.staking.add('100', constants.ZERO_ADDRESS, ONE_THOUSAND_TOKENS, true, {from: adminAlice}),
+        'add: _erc20Token must not be zero address'
+      );
+    });
+
+    it('can not "add" if token cap is zero', async () => {
+      await expectRevert(
+        this.staking.add('100', this.staking.address, toBn('0'), true, {from: adminAlice}),
+        'add: _maxStakingAmountPerUser must be greater than zero'
+      );
+    });
+
     it('can not "set" if not owner', async () => {
       await expectRevert(
         this.staking.set(POOL_ZERO, '100', ONE_THOUSAND_TOKENS, true, {from: bob}),
         'Ownable: caller is not the owner'
+      );
+    });
+
+    it('can not "set" if token cap is zero', async () => {
+      await expectRevert(
+        this.staking.set(POOL_ZERO, '100', toBn('0'), true, {from: adminAlice}),
+        'set: _maxStakingAmountPerUser must be greater than zero'
+      );
+    });
+
+    it('can "set" with invalid pid', async () => {
+      await expectRevert(
+        this.staking.set(POOL_ONE, '500', ONE_THOUSAND_TOKENS, true, {from: adminAlice}),
+        'set: invalid _pid'
       );
     });
 
@@ -639,6 +762,19 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
 
       await this.staking.set(POOL_ZERO, '500', ONE_THOUSAND_TOKENS, false, {from: adminAlice});
       assert.equal((await this.staking.farmInfo(POOL_ZERO))[1].toString(), '500'); // allocPoint
+    });
+
+    it('can not "add" or "set" if after completion', async () => {
+      await time.advanceBlockTo(this.startBlock.add(toBn('201')));
+      await expectRevert(
+        this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice}),
+        'add: must be before end'
+      );
+
+      await expectRevert(
+        this.staking.set(POOL_ZERO, '100', ONE_THOUSAND_TOKENS, true, {from: adminAlice}),
+        'set: must be before end'
+      );
     });
   });
 });
