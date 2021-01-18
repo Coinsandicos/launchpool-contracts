@@ -31,18 +31,18 @@ contract LaunchPoolStaking is Ownable {
 
     // Info of each pool.
     struct PoolInfo {
-        IERC20 lpToken;           // Address of LP token contract.
-        uint256 allocPoint;       // How many allocation points assigned to this pool. LPTs to distribute per block.
-        uint256 lastRewardBlock;  // Last block number that LPTs distribution occurs.
-        uint256 accLptPerShare; // Accumulated LPTs per share, times 1e18. See below.
-        uint256 tokenCap; // Max. amount of tokens per account
+        IERC20 lpToken;            // Address of LP token contract.
+        uint256 allocPoint;        // How many allocation points assigned to this pool. LPTs to distribute per block.
+        uint256 lastRewardBlock;   // Last block number that LPTs distribution occurs.
+        uint256 accLptPerShare;    // Accumulated LPTs per share, times 1e18. See below.
+        uint256 tokenCap;          // Max. amount of tokens per account
     }
 
     // The $LPT TOKEN!
     LaunchPoolToken public lpt;
     // LPT tokens created per block.
     uint256 public lptPerBlock;
-    /// @notice The total max amount of reward token to farm.
+    /// @notice The total limit of rewards
     uint256 public rewardLimit;
     // Info of each pool.
     PoolInfo[] public poolInfo;
@@ -86,6 +86,7 @@ contract LaunchPoolStaking is Ownable {
     function add(uint256 _allocPoint, IERC20 _lpToken, uint256 _tokenCap, bool _withUpdate) public onlyOwner {
         require(block.number < endBlock, "add: must be before end");
         require(address(_lpToken) != address(0), "add: _lpToken must not be zero address");
+        require(_tokenCap > 0, "add: _tokenCap must be greater than zero");
 
         if (_withUpdate) {
             massUpdatePools();
@@ -106,6 +107,7 @@ contract LaunchPoolStaking is Ownable {
     function set(uint256 _pid, uint256 _allocPoint, uint256 _tokenCap, bool _withUpdate) public onlyOwner {
         require(block.number < endBlock, "set: must be before end");
         require(_pid < poolInfo.length, "set: invalid _pid");
+        require(_tokenCap > 0, "set: _tokenCap must be greater than zero");
 
         if (_withUpdate) {
             massUpdatePools();
