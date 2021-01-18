@@ -56,7 +56,7 @@ contract LaunchPoolStaking is Ownable {
     /// @notice List of farms that users can stake into
     FarmInfo[] public farmInfo;
 
-    /// @notice Per pool, info of each user that stakes LP tokens.
+    /// @notice Per pool, info of each user that stakes ERC20 tokens.
     /// @notice Pool ID => User Address => User Info
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
 
@@ -105,7 +105,7 @@ contract LaunchPoolStaking is Ownable {
         return farmInfo.length;
     }
 
-    /// @notice Create a new LPT farm by whitelisting a new LP token.
+    /// @notice Create a new LPT farm by whitelisting a new ERC20 token.
     /// @dev Can only be called by the contract owner
     /// @param _allocPoint Governs what percentage of the total LPT rewards this farm and other farms will get
     /// @param _erc20Token Address of the staking token being whitelisted
@@ -198,8 +198,8 @@ contract LaunchPoolStaking is Ownable {
             return;
         }
 
-        uint256 lpSupply = farm.erc20Token.balanceOf(address(this));
-        if (lpSupply == 0) {
+        uint256 erc20Supply = farm.erc20Token.balanceOf(address(this));
+        if (erc20Supply == 0) {
             farm.lastRewardBlock = block.number;
             return;
         }
@@ -214,13 +214,13 @@ contract LaunchPoolStaking is Ownable {
 
         uint256 lptReward = multiplier.mul(lptPerBlock).mul(farm.allocPoint).div(totalAllocPoint);
 
-        farm.accLptPerShare = farm.accLptPerShare.add(lptReward.mul(1e18).div(lpSupply));
+        farm.accLptPerShare = farm.accLptPerShare.add(lptReward.mul(1e18).div(erc20Supply));
         farm.lastRewardBlock = maxEndBlock;
     }
 
-    /// @notice Where any user can stake their LP tokens into a farm in order to farm $LPT
+    /// @notice Where any user can stake their ERC20 tokens into a farm in order to farm $LPT
     /// @param _pid ID of the farm
-    /// @param _amount Amount of LP being staked
+    /// @param _amount Amount of ERC20 being staked
     function deposit(uint256 _pid, uint256 _amount) external {
         FarmInfo storage farm = farmInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -245,7 +245,7 @@ contract LaunchPoolStaking is Ownable {
         emit Deposit(msg.sender, _pid, _amount);
     }
 
-    /// @notice Allows a user to withdraw any LP tokens staked in a farm
+    /// @notice Allows a user to withdraw any ERC20 tokens staked in a farm
     /// @dev Partial withdrawals permitted
     /// @param _pid Farm ID
     /// @param _amount Being withdrawn
