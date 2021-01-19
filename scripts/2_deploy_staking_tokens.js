@@ -1,0 +1,50 @@
+const prompt = require('prompt-sync')();
+
+async function main() {
+  const [deployer] = await ethers.getSigners();
+  console.log(
+    "Deploying Staking tokens with the account:",
+    await deployer.getAddress()
+  );
+
+  const initialSupplyRecipient = prompt('Initial supply recipient? ');
+
+  let tokens = [
+    'LPA',
+    'LP1',
+    'LP2',
+    'LP3',
+    'LP4',
+    'LP5',
+    'LP6',
+    'LP7',
+    'LP8',
+    'LP9',
+    'LP10',
+  ];
+
+  const lpTokensSymbols = Array(25).fill().map((_, i) => `LP${i + 1}`);
+
+  tokens = tokens.concat(lpTokensSymbols);
+
+  const StakingERC20 = await ethers.getContractFactory("StakingERC20");
+
+  for (const symbol of tokens) {
+
+    prompt(`Deploying ${symbol} - hit enter to continue`);
+
+    const token = await StakingERC20.deploy("LPA", "LPA", initialSupplyRecipient);
+    await token.deployed();
+
+    console.log(`Token deployed ${symbol} deployed at: `, token.address);
+  }
+
+  console.log('Finished!');
+}
+
+main()
+  .then(() => process.exit(0))
+  .catch(error => {
+    console.error(error);
+    process.exit(1);
+  });

@@ -11,9 +11,9 @@ async function main() {
   const initialSupplyRecipient = prompt('Initial supply recipient? ');
   const minter = prompt('Minter? ');
 
-  console.log('\nInitial supply', initialSupply)
-  console.log('\nInitial supply recipient', initialSupplyRecipient)
-  console.log('\nMinter', minter)
+  console.log('\nInitial supply', initialSupply);
+  console.log('\nInitial supply recipient', initialSupplyRecipient);
+  console.log('\nMinter', minter);
 
   prompt('If happy, hit enter...');
 
