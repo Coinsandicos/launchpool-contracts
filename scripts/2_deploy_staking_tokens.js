@@ -9,19 +9,10 @@ async function main() {
 
   const initialSupplyRecipient = prompt('Initial supply recipient? ');
 
-  let tokens = [
-    'LPA',
-    'LP1',
-    'LP2',
-    'LP3',
-    'LP4',
-    'LP5',
-    'LP6',
-    'LP7',
-    'LP8',
-    'LP9',
-    'LP10',
-  ];
+  let tokens = ['LPA'];
+
+  // remove for main
+  tokens = tokens.concat(['XTP', 'STPT', 'ZEN', 'FTM', 'SHR', 'LPT/ETH']);
 
   const lpTokensSymbols = Array(25).fill().map((_, i) => `LP${i + 1}`);
 
@@ -31,12 +22,13 @@ async function main() {
 
   for (const symbol of tokens) {
 
-    prompt(`Deploying ${symbol} - hit enter to continue`);
+    // prompt(`Deploying ${symbol} - hit enter to continue`);
 
-    const token = await StakingERC20.deploy("LPA", "LPA", initialSupplyRecipient);
+    const token = await StakingERC20.deploy(symbol, symbol, initialSupplyRecipient);
     await token.deployed();
 
-    console.log(`Token deployed ${symbol} deployed at: `, token.address);
+    // console.log(`Token deployed ${symbol} deployed at: `, token.address);
+    console.log(token.address);
   }
 
   console.log('Finished!');
