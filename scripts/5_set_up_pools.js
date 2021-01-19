@@ -97,7 +97,7 @@ async function main() {
   let x = 0;
   for (const pool of pools) {
 
-    prompt(`Adding pool ${x} - hit enter to continue`);
+    prompt(`Adding pool ${x + 1} - hit enter to continue`);
 
     await staking.add(ethers.utils.parseEther(pool[0].toString()), tokenAddresses[x], pool[2], false);
     console.log(`pool added for ${tokenAddresses[x]} with weighting of ${ethers.utils.parseEther(pool[0].toString())}`);
