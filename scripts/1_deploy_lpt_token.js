@@ -7,9 +7,9 @@ async function main() {
     await deployer.getAddress()
   );
 
-  const initialSupply = prompt('Initial supply? (Ether amount) '); // 10 million
+  const initialSupply = '10000000'; // 10 million
   const initialSupplyRecipient = prompt('Initial supply recipient? ');
-  const minter = prompt('Minter? '); // zero address
+  const minter = '0x0000000000000000000000000000000000000000'; // no one can mint additional tokens
 
   console.log('\nInitial supply', initialSupply);
   console.log('\nInitial supply recipient', initialSupplyRecipient);

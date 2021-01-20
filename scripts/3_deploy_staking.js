@@ -1,7 +1,5 @@
 const prompt = require('prompt-sync')();
 
-const LaunchPoolTokenMetadata = require('../artifacts/LaunchPoolToken.json');
-
 async function main() {
   const [deployer] = await ethers.getSigners();
   console.log(
