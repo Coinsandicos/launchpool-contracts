@@ -34,20 +34,6 @@ async function main() {
 
   console.log('Staking deployed at', staking.address);
 
-
-  // FIXME would AB send these on main?
-  const lptToken = new ethers.Contract(
-    tokenAddress,
-    LaunchPoolTokenMetadata.abi,
-    deployer //provider
-  );
-
-  console.log(lptToken);
-
-  await lptToken.transfer(staking.address, ethers.utils.parseEther(maxLPTRewards));
-
-  console.log('Sent maxLPTReward to', staking.address);
-
   console.log('Finished!');
 }
 
