@@ -12,7 +12,7 @@ async function main() {
   let tokens = ['LPA'];
 
   // remove for main
-  tokens = tokens.concat(['XTP', 'STPT', 'ZEN', 'FTM', 'SHR', 'LPT/ETH']);
+  // tokens = tokens.concat(['XTP', 'STPT', 'ZEN', 'FTM', 'SHR', 'LPT/ETH']);
 
   const lpTokensSymbols = Array(25).fill().map((_, i) => `LP${i + 1}`);
 
