@@ -21,9 +21,6 @@ contract LaunchPoolToken {
     /// @notice Total number of tokens in circulation
     uint public totalSupply;
 
-    /// @notice Minter address
-    address public minter;
-
     /// @notice Allowance amounts on behalf of others
     mapping (address => mapping (address => uint96)) internal allowances;
 
@@ -66,23 +63,14 @@ contract LaunchPoolToken {
     /// @notice The standard EIP-20 approval event
     event Approval(address indexed owner, address indexed spender, uint256 amount);
 
-    /// @notice An event thats emitted when the minter is changed
-    event NewMinter(address minter);
-
-    modifier onlyMinter {
-        require(msg.sender == minter, "Token:onlyMinter: should only be called by minter");
-        _;
-    }
-
     /**
      * @notice Construct a new Fuel token
      * @param initialSupply The initial supply minted at deployment
      * @param account The initial account to grant all the tokens
      */
-    constructor(uint initialSupply, address account, address _minter) public {
+    constructor(uint initialSupply, address account) public {
         totalSupply = safe96(initialSupply, "Token::constructor:amount exceeds 96 bits");
         balances[account] = uint96(initialSupply);
-        minter = _minter;
         emit Transfer(address(0), account, initialSupply);
     }
 
@@ -128,33 +116,12 @@ contract LaunchPoolToken {
     }
 
     /**
-     * @notice Mint `amount` tokens to `dst`
-     * @param dst The address of the destination account
-     * @param rawAmount The number of tokens to mint
-     * @notice only callable by minter
-     */
-    function mint(address dst, uint rawAmount) external onlyMinter {
-        uint96 amount = safe96(rawAmount, "Token::mint: amount exceeds 96 bits");
-        _mintTokens(dst, amount);
-    }
-
-    /**
      * @notice Burn `amount` tokens
      * @param rawAmount The number of tokens to burn
      */
     function burn(uint rawAmount) external {
         uint96 amount = safe96(rawAmount, "Token::burn: amount exceeds 96 bits");
         _burnTokens(msg.sender, amount);
-    }
-
-    /**
-     * @notice Change minter address to `account`
-     * @param account The address of the new minter
-     * @notice only callable by minter
-     */
-    function changeMinter(address account) external onlyMinter {
-        minter = account;
-        emit NewMinter(account);
     }
 
     /**

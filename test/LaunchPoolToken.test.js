@@ -43,7 +43,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
     const startBlock = '0';
     const endBlock = '100';
 
-    this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
+    this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, {from: adminAlice});
     this.xtp = await MockERC20.new('TAP Token', 'XTP', '10000000000', {from: minter});
 
     this.staking = await LaunchPoolStaking.new(
@@ -78,7 +78,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
 
     it('revert if end before start', async () => {
 
-      this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
+      this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, {from: adminAlice});
       await expectRevert(
         LaunchPoolStaking.new(
           this.launchPoolToken.address,
@@ -93,7 +93,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
 
     it('revert if reward limit is zero', async () => {
 
-      this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
+      this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, {from: adminAlice});
       await expectRevert(
         LaunchPoolStaking.new(
           this.launchPoolToken.address,
@@ -110,7 +110,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
   context('With one token added to the staking pools', () => {
 
     beforeEach(async () => {
-      this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
+      this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, {from: adminAlice});
 
       // setup initial LP coin
       this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP', minter);
@@ -444,7 +444,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
   context('emergencyWithdraw()', async () => {
 
     beforeEach(async () => {
-      this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
+      this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, {from: adminAlice});
 
       // setup initial LP coin
       this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP', minter);
@@ -531,7 +531,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
   context('withdraw()', async () => {
 
     beforeEach(async () => {
-      this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
+      this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, {from: adminAlice});
 
       // setup initial LP coin
       this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP', minter);
@@ -692,7 +692,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
     const endBlock = '100';
 
     beforeEach(async () => {
-      this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, adminAlice, {from: adminAlice});
+      this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, {from: adminAlice});
 
       this.xtp = await makeCoinAndSetupUsers('LPToken', 'XTP', minter);
 

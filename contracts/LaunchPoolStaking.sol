@@ -87,7 +87,6 @@ contract LaunchPoolStaking is Ownable {
         uint256 _endBlock
     ) public {
         require(address(_lpt) != address(0), "constructor: _lpt must not be zero address");
-        require(_endBlock > _startBlock, "constructor: end must be after start");
         require(_maxLPTAvailableForFarming > 0, "constructor: _maxLPTAvailableForFarming must be greater than zero");
 
         lpt = _lpt;
