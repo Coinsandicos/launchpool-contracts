@@ -22,6 +22,11 @@ async function main() {
 
   // todo add non LP<x> tokens, new LP<x> tokens and latest allocation points
   const pools = [
+    [TODO,  '', TODO], // LPT (naked)
+    [TODO,  '', TODO], // LPT/ETH UNI-V2
+    [TODO,  '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984', TODO], // UNI
+    [TODO,  '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2', TODO], // SUSHI
+    [TODO,  '0x111111111117dc0aa78b770fa6a738034120c302', TODO], // 1INCH
     [0.2805555556,  '0x51bBE29e4BF7A07E036d87993d98058269bE8B27', 5], // LP1
     [0.04629629556, '0xAe33E20790528CF40BA312C78f4741a340375d54', 5],
     [0.04629629556, '0xEe2244a98279558248C4A3ff7fff1f2e7e68AA06', 5],
