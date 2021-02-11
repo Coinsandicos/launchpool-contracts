@@ -11,14 +11,14 @@ async function main() {
 
   const tokenAddress = prompt('LPT token address? ');
   const stakingAddress = prompt('Staking address? ');
-  const lptRewards = prompt('LPT rewards amount? ');
-
+  const lptRewards = 8500000;
 
   console.log('LPT token', tokenAddress);
   console.log('Staking', stakingAddress);
   console.log('LPT rewards', lptRewards);
 
-  // FIXME would AB send these on main?
+  prompt('If happy, hit enter...');
+
   const lptToken = new ethers.Contract(
     tokenAddress,
     LaunchPoolTokenMetadata.abi,
