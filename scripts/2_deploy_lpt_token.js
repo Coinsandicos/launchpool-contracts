@@ -9,11 +9,9 @@ async function main() {
 
   const initialSupply = '10000000'; // 10 million
   const initialSupplyRecipient = await deployer.getAddress();
-  const minter = '0x0000000000000000000000000000000000000000'; // no one can mint additional tokens
 
   console.log('\nInitial supply', initialSupply);
   console.log('\nInitial supply recipient', initialSupplyRecipient);
-  console.log('\nMinter', minter);
 
   prompt('If happy, hit enter...');
 
@@ -22,7 +20,6 @@ async function main() {
   const token = await LaunchPoolTokenFactory.deploy(
     ethers.utils.parseEther(initialSupply),
     initialSupplyRecipient,
-    minter
   );
 
   await token.deployed();
@@ -30,9 +27,9 @@ async function main() {
   console.log('Token deployed at', token.address);
 
   // todo get address
-  const nonMiningLPTRecipient = 'TODO'
-  console.log(`Sending 1.5m to ${nonMiningLPTRecipient}`)
-  await token.transfer(nonMiningLPTRecipient, ethers.utils.parseEther(1500000))
+  const nonMiningLPTRecipient = 'TODO';
+  console.log(`Sending 1.5m to ${nonMiningLPTRecipient}`);
+  await token.transfer(nonMiningLPTRecipient, ethers.utils.parseEther(1500000));
 
   console.log('Finished!');
 }

@@ -76,21 +76,6 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       );
     });
 
-    it('revert if end before start', async () => {
-
-      this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, {from: adminAlice});
-      await expectRevert(
-        LaunchPoolStaking.new(
-          this.launchPoolToken.address,
-          rewardLimit,
-          2,
-          1,
-          {from: adminAlice}
-        ),
-        'constructor: end must be after start'
-      );
-    });
-
     it('revert if reward limit is zero', async () => {
 
       this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, {from: adminAlice});
