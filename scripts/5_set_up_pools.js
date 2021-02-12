@@ -80,7 +80,7 @@ async function main() {
     const decimals = await token.decimals()
 
     await staking.add(
-      ethers.utils.parseEther(allocPoint.toString()),
+      allocPoint.toString(),
       tokenAddress,
       ethers.utils.parseUnits(maxStakingPerUser.toString(), decimals),
       false
