@@ -21,17 +21,17 @@ async function main() {
   );
 
   const pools = [
-    // [Math.trunc(2.9412 * 10000),  '', TODO], // LPT (naked)
+    [Math.trunc(2.9412 * 10000),  '0x6149C26Cd2f7b5CCdb32029aF817123F6E37Df5B', 10000000], // LPT (naked)
     // [Math.trunc(8.8235 * 10000),  '', TODO], // LPT/ETH UNI-V2
-    [Math.trunc(1.4706 * 10000), '0xde7d85157d9714eadf595045cc12ca4a5f3e2adb', TODO], // STPT
-    [Math.trunc(1.4706 * 10000), '0xd98f75b1a3261dab9eed4956c93f33749027a964', TODO], // SHR
-    [Math.trunc(1.4706 * 10000), '0x8c8687fc965593dfb2f0b4eaefd55e9d8df348df', TODO], // PAID
-    [Math.trunc(2.0588 * 10000), '0x83e6f1E41cdd28eAcEB20Cb649155049Fac3D5Aa', TODO], // POLS
-    [Math.trunc(1.4706 * 10000), '0xd2dda223b2617cb616c1580db421e4cfae6a8a85', TODO], // BONDLY
-    [Math.trunc(2.0588 * 10000), '0x3155ba85d5f96b2d030a4966af206230e46849cb', TODO], // RUNE - thorchain?
-    [Math.trunc(2.0588 * 10000), '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984', TODO], // UNI
-    [Math.trunc(2.0588 * 10000), '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2', TODO], // SUSHI
-    [Math.trunc(2.0588 * 10000), '0x111111111117dc0aa78b770fa6a738034120c302', TODO], // 1INCH
+    [Math.trunc(1.4706 * 10000), '0xde7d85157d9714eadf595045cc12ca4a5f3e2adb', 350000], // STPT
+    [Math.trunc(1.4706 * 10000), '0xd98f75b1a3261dab9eed4956c93f33749027a964', 500000], // SHR
+    [Math.trunc(1.4706 * 10000), '0x8c8687fc965593dfb2f0b4eaefd55e9d8df348df', 3100], // PAID
+    [Math.trunc(2.0588 * 10000), '0x83e6f1E41cdd28eAcEB20Cb649155049Fac3D5Aa', 4000], // POLS
+    [Math.trunc(1.4706 * 10000), '0xd2dda223b2617cb616c1580db421e4cfae6a8a85', 27500], // BONDLY
+    [Math.trunc(2.0588 * 10000), '0x3155ba85d5f96b2d030a4966af206230e46849cb', 2200], // RUNE - thorchain?
+    [Math.trunc(2.0588 * 10000), '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984', 500], // UNI
+    [Math.trunc(2.0588 * 10000), '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2', 690], // SUSHI
+    [Math.trunc(2.0588 * 10000), '0x111111111117dc0aa78b770fa6a738034120c302', 2000], // 1INCH
     [Math.trunc(1.7647 * 10000), '0x51bBE29e4BF7A07E036d87993d98058269bE8B27', 5], // LP1
     [Math.trunc(1.7647 * 10000), '0xAe33E20790528CF40BA312C78f4741a340375d54', 5],
     [Math.trunc(1.7647 * 10000), '0xEe2244a98279558248C4A3ff7fff1f2e7e68AA06', 5],
