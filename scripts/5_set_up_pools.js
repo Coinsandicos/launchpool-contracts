@@ -66,9 +66,6 @@ async function main() {
   console.log(`Adding ${pools.length} pools`);
 
   for (let x = 0; x < pools.length; x++) {
-
-    prompt(`Adding pool ${x + 1} - hit enter to continue`);
-
     const [allocPoint, tokenAddress, maxStakingPerUser] = pools[x]
 
     const token = new ethers.Contract(
@@ -79,6 +76,8 @@ async function main() {
 
     const decimals = await token.decimals()
 
+    prompt(`Adding pool ${x + 1} with data {${allocPoint}-${tokenAddress}-${maxStakingPerUser}} - hit enter to continue`);
+
     await staking.add(
       allocPoint.toString(),
       tokenAddress,
@@ -86,7 +85,7 @@ async function main() {
       false
     );
 
-    console.log(`pool added for ${tokenAddress} with weighting of ${ethers.utils.parseEther(allocPoint.toString())}`);
+    console.log(`pool added for ${tokenAddress} with weighting of ${allocPoint.toString()}`);
   }
 
   console.log('Finished!');
