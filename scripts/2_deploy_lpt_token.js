@@ -26,9 +26,11 @@ async function main() {
 
   console.log('Token deployed at', token.address);
 
-  // todo get address
-  const nonMiningLPTRecipient = 'TODO';
+  const nonMiningLPTRecipient = '0x6512c12d2aaa2d4a2f5267bedc4ec8f96bc60549';
   console.log(`Sending 1.5m to ${nonMiningLPTRecipient}`);
+
+  prompt('If happy, hit enter...');
+
   await token.transfer(nonMiningLPTRecipient, ethers.utils.parseEther(1500000));
 
   console.log('Finished!');
