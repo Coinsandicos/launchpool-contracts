@@ -57,10 +57,10 @@ async function main() {
     [Math.trunc(1.4706 * 10000), '0x36fde87f35A3f46D6bE39b6A45b3488F8bEEa48B', 5],
     [Math.trunc(0.2941 * 10000), '0x8e399A1aa50a79987ade1245e9c14f49dF7BB364', 5],
     [Math.trunc(0.8824 * 10000), '0x26f250848bAA311A646651c8BEDc931e763E9d7A', 5], // LP25
-    [Math.trunc(1.4706 * 10000),  TODO, 5], // LP26
-    [Math.trunc(0.5882 * 10000),  TODO, 5], // LP27
-    [Math.trunc(0.5882 * 10000),  TODO, 5], // LP28
-    [Math.trunc(22.3529 * 10000), TODO, 5], // LP29 / Endeavor
+    [Math.trunc(1.4706 * 10000), '0x57aFc3D0B8F7E7E25FBbc4138CA9449435cc827a', 5], // LP26
+    [Math.trunc(0.5882 * 10000), '0x8163083fDa83728e19c8F170E8C66D3b5E64379D', 5], // LP27
+    [Math.trunc(0.5882 * 10000), '0x05524153Bb4a37E84180c923A0186419B80c0e6b', 5], // LP28
+    [Math.trunc(22.3529 * 10000),'0xAE476DAee91Ee460E00f1A6BcA98EB32C01FA95E', 5], // LP29 / Endeavor
   ];
 
   console.log(`Adding ${pools.length} pools`);
