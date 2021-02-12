@@ -11,7 +11,7 @@ async function main() {
 
   const tokenAddress = prompt('LPT token address? ');
   const stakingAddress = prompt('Staking address? ');
-  const lptRewards = 8500000;
+  const lptRewards = '8500000';
 
   console.log('LPT token', tokenAddress);
   console.log('Staking', stakingAddress);

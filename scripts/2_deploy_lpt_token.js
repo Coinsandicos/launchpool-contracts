@@ -31,7 +31,7 @@ async function main() {
 
   prompt('If happy, hit enter...');
 
-  await token.transfer(nonMiningLPTRecipient, ethers.utils.parseEther(1500000));
+  await token.transfer(nonMiningLPTRecipient, ethers.utils.parseEther('1500000'));
 
   console.log('Finished!');
 }
