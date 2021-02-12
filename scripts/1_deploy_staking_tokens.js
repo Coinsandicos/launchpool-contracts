@@ -15,8 +15,7 @@ async function main() {
 
   //let tokens = ['LPA'];
 
-  //const lpTokensSymbols = Array(25).fill().map((_, i) => `LP${i + 1}`)
-  const lpTokensSymbols = []
+  const lpTokensSymbols = Array(4).fill().map((_, i) => `LP${i + 25}`) //26-29
 
   //tokens = tokens.concat(lpTokensSymbols);
 
