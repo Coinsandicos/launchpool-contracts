@@ -1,7 +1,6 @@
 const prompt = require('prompt-sync')();
 
 const LaunchPoolStakingMetadata = require('../artifacts/LaunchPoolStaking.json');
-const ERC20Metadata = require('../artifacts/StakingERC20.json');
 
 async function main() {
   const [deployer] = await ethers.getSigners();
