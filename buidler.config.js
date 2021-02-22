@@ -22,11 +22,11 @@ module.exports = {
     enabled: false
   },
   networks: {
-    mainnet: {
-      gasPrice: 158000000000, // 158 gwei
-      url: `https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}`,
-      accounts: [`${PRIVATE_KEY}`]
-    },
+    // mainnet: {
+    //   gasPrice: 158000000000, // 158 gwei
+    //   url: `https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}`,
+    //   accounts: [`${PRIVATE_KEY}`]
+    // },
     ropsten: {
       gasPrice: 5000000000, // 5 gwei
       url: `https://ropsten.infura.io/v3/${INFURA_PROJECT_ID}`,

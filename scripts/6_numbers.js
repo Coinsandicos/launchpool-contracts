@@ -1,8 +1,5 @@
 const prompt = require('prompt-sync')();
 
-const LaunchPoolStakingMetadata = require('../artifacts/LaunchPoolStaking.json');
-const ERC20Metadata = require('../artifacts/StakingERC20.json');
-
 async function main() {
   const [deployer] = await ethers.getSigners();
   console.log(
@@ -10,25 +7,16 @@ async function main() {
     await deployer.getAddress()
   );
 
-  const stakingAddress = prompt('Staking address? ');
-
-  console.log('Staking', stakingAddress);
-
-  const staking = new ethers.Contract(
-    stakingAddress,
-    LaunchPoolStakingMetadata.abi,
-    deployer //provider
-  );
-
   const pools = [
     [Math.trunc(2.9412 * 10000),  '0x6149C26Cd2f7b5CCdb32029aF817123F6E37Df5B', 10000000], // LPT (naked)
-    // [Math.trunc(8.8235 * 10000),  '', TODO], // LPT/ETH UNI-V2
+    [Math.trunc(10.2941 * 10000),  ''], // LPT/ETH UNI-V2 10.2941%
     [Math.trunc(1.4706 * 10000), '0xde7d85157d9714eadf595045cc12ca4a5f3e2adb', 350000], // STPT
     [Math.trunc(1.4706 * 10000), '0xd98f75b1a3261dab9eed4956c93f33749027a964', 500000], // SHR
     [Math.trunc(1.4706 * 10000), '0x8c8687fc965593dfb2f0b4eaefd55e9d8df348df', 3100], // PAID
     [Math.trunc(2.0588 * 10000), '0x83e6f1E41cdd28eAcEB20Cb649155049Fac3D5Aa', 4000], // POLS
     [Math.trunc(1.4706 * 10000), '0xd2dda223b2617cb616c1580db421e4cfae6a8a85', 27500], // BONDLY
-    [Math.trunc(2.0588 * 10000), '0x3155ba85d5f96b2d030a4966af206230e46849cb', 2200], // RUNE - thorchain?
+    // [Math.trunc(2.0588 * 10000), '0x3155ba85d5f96b2d030a4966af206230e46849cb', 2200], // RUNE - thorchain?  - WRONG
+    [Math.trunc(1.4706 * 10000), '0x3155ba85d5f96b2d030a4966af206230e46849cb', 2200], // RUNE - thorchain?
     [Math.trunc(2.0588 * 10000), '0x1f9840a85d5af5bf1d1762f925bdaddc4201f984', 500], // UNI
     [Math.trunc(2.0588 * 10000), '0x6b3595068778dd592e39a122f4f5a5cf09c90fe2', 690], // SUSHI
     [Math.trunc(2.0588 * 10000), '0x111111111117dc0aa78b770fa6a738034120c302', 2000], // 1INCH
@@ -39,7 +27,8 @@ async function main() {
     [Math.trunc(1.7647 * 10000), '0x4bF95381e61014c4CE99e9Ab8CDE71bfbC191931', 5],
     [Math.trunc(1.7647 * 10000), '0xCa84d42Af8a86Df06b114cf1D2371F73BEa6eE51', 5],
     [Math.trunc(1.7647 * 10000), '0x43c5FE8506B18DBADe8970103f227942D893CC9f', 5],
-    [Math.trunc(7.0588 * 10000), '0xa85be3676C951EBC82C89782aBA8da6089D69cb5', 5],
+    // [Math.trunc(7.0588 * 10000), '0xa85be3676C951EBC82C89782aBA8da6089D69cb5', 5], // WRONG???
+    [Math.trunc(6.1765 * 10000), '0xa85be3676C951EBC82C89782aBA8da6089D69cb5', 5], // WRONG???
     [Math.trunc(6.1765 * 10000), '0x7E6C5E1e5fC3024Ab05985b079172430184A6483', 5],
     [Math.trunc(5.8824 * 10000), '0xF36742519DD2d8eFdBEc64F40f859602faC4d71F', 5],
     [Math.trunc(1.4706 * 10000), '0xfa2c155CdF3DcdA80794244130B1379f8478DBB7', 5],
@@ -63,32 +52,16 @@ async function main() {
     [Math.trunc(22.3529 * 10000),'0xAE476DAee91Ee460E00f1A6BcA98EB32C01FA95E', 5], // LP29 / Endeavor
   ];
 
-  console.log(`Adding ${pools.length} pools`);
-
+  let totalAllocPoint = 0.0;
   for (let x = 0; x < pools.length; x++) {
     const [allocPoint, tokenAddress, maxStakingPerUser] = pools[x]
 
-    const token = new ethers.Contract(
-      tokenAddress,
-      ERC20Metadata.abi,
-      deployer //provider
-    );
+    totalAllocPoint += allocPoint;
 
-    const decimals = await token.decimals()
-
-    prompt(`Adding pool ${x + 1} with data {${allocPoint}-${tokenAddress}-${maxStakingPerUser}} - hit enter to continue`);
-
-    await staking.add(
-      allocPoint.toString(),
-      tokenAddress,
-      ethers.utils.parseUnits(maxStakingPerUser.toString(), decimals),
-      false
-    );
-
-    console.log(`pool added for ${tokenAddress} with weighting of ${allocPoint.toString()}`);
+    console.log('alloc point', allocPoint);
   }
 
-  console.log('Finished!');
+  console.log('Finished!', totalAllocPoint / 10000);
 }
 
 main()
