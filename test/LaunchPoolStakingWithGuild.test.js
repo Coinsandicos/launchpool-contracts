@@ -276,14 +276,18 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
       );
     });
 
-    it.skip('can "set" if owner (with update)', async () => {
+    it('can "set" if owner (with update)', async () => {
+      await this.staking.add('100', this.staking.address, toBn('5'), true, {from: adminAlice});
+
       assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '100'); // allocPoint
 
       await this.staking.set(POOL_ZERO, '500', ONE_THOUSAND_TOKENS, true, {from: adminAlice});
       assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '500'); // allocPoint
     });
 
-    it.skip('can "set" if owner (without update)', async () => {
+    it('can "set" if owner (without update)', async () => {
+      await this.staking.add('100', this.staking.address, toBn('5'), true, {from: adminAlice});
+
       assert.equal((await this.staking.poolInfo(POOL_ZERO))[1].toString(), '100'); // allocPoint
 
       await this.staking.set(POOL_ZERO, '500', ONE_THOUSAND_TOKENS, false, {from: adminAlice});
