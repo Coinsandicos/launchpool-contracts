@@ -6,7 +6,7 @@ usePlugin("solidity-coverage");
 usePlugin("@nomiclabs/buidler-solhint");
 
 const INFURA_PROJECT_ID = process.env.INFURA_PROJECT_ID;
-const PRIVATE_KEY = process.env.PRIVATE_KEY;
+const PRIVATE_KEY = process.env.LAUNCH_POOL_PRIVATE_KEY;
 const PRIVATE_PRIVATE_KEY = process.env.PRIVATE_PRIVATE_KEY;
 
 module.exports = {
@@ -22,10 +22,11 @@ module.exports = {
     enabled: false
   },
   networks: {
-    mainnet: {
-      url: `https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}`,
-      accounts: [`0x${PRIVATE_KEY}`]
-    },
+    // mainnet: {
+    //   gasPrice: 158000000000, // 158 gwei
+    //   url: `https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}`,
+    //   accounts: [`${PRIVATE_KEY}`]
+    // },
     ropsten: {
       gasPrice: 5000000000, // 5 gwei
       url: `https://ropsten.infura.io/v3/${INFURA_PROJECT_ID}`,

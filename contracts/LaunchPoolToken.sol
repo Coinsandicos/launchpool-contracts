@@ -10,10 +10,10 @@ pragma experimental ABIEncoderV2;
 
 contract LaunchPoolToken {
     /// @notice EIP-20 token name for this token
-    string public constant name = "LaunchPoolToken";
+    string public constant name = "Launchpool token";
 
     /// @notice EIP-20 token symbol for this token
-    string public constant symbol = "LPT";
+    string public constant symbol = "LPOOL";
 
     /// @notice EIP-20 token decimals for this token
     uint8 public constant decimals = 18;

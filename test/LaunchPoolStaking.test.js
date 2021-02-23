@@ -76,21 +76,6 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       );
     });
 
-    it('revert if end before start', async () => {
-
-      this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, {from: adminAlice});
-      await expectRevert(
-        LaunchPoolStaking.new(
-          this.launchPoolToken.address,
-          rewardLimit,
-          2,
-          1,
-          {from: adminAlice}
-        ),
-        'constructor: end must be after start'
-      );
-    });
-
     it('revert if reward limit is zero', async () => {
 
       this.launchPoolToken = await LaunchPoolToken.new(ONE_THOUSAND_TOKENS, launchPoolAdmin, {from: adminAlice});
@@ -405,8 +390,91 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), '999999999999999999999'); // balance stays same
     });
 
-    it('should issue reward tokens correctly with 2 people in 2 pools with different allocations in each', async () => {
-      // TODO
+    it.only('should issue reward tokens with two differently allocated pools, 1 person in each pool, and set one pool to zero', async () => {
+
+      ////////////////////////////////
+      // 2 pools of equal weighting //
+      // pool 1 has 100 allocation  //
+      // pool 1 has 50 allocation   //
+      ////////////////////////////////
+
+      // 100 per block farming rate starting at block 100 with all issuance ending on block 200
+      this.staking = await LaunchPoolStaking.new(
+        this.launchPoolToken.address,
+        to18DP('1000'), // 1k rewards = 10 rewards per block
+        this.startBlock.add(toBn('100')), // start mining block number
+        this.startBlock.add(toBn('200')), // end mining block number
+        {from: adminAlice}
+      );
+
+      // transfer tokens to launch pool so they can be allocation accordingly
+      await this.launchPoolToken.transfer(this.staking.address, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
+
+      // add the first pool
+      await this.staking.add('100', this.xtp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
+
+      // Make another coin for the pool
+      this.xrp = await makeCoinAndSetupUsers('XRPPooCoin', 'XRP', minter);
+      await this.staking.add('50', this.xrp.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
+
+      // check pool length now
+      assert.equal((await this.staking.numberOfPools()).toString(), '2');
+
+      // Deposit liquidity into pool 0
+      await this.xtp.approve(this.staking.address, '1000', {from: bob});
+      await this.staking.deposit(POOL_ZERO, '100', {from: bob});
+
+      // Deposit 50 liquidity into pool 1
+      await this.xrp.approve(this.staking.address, '1000', {from: bob});
+      await this.staking.deposit(POOL_ONE, '50', {from: bob});
+
+      // Move into block 110 to trigger some rewards from each, split accordingly
+      await time.advanceBlockTo(this.startBlock.add(toBn('110')));
+
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), '66666666666666666666');
+      assert.equal((await this.staking.pendingLpt(POOL_ONE, bob)).toString(), '33333333333333333333');
+
+      // await this.staking.updatePool('0');
+      // await this.staking.updatePool('1');
+
+      // set zero to zero
+      await this.staking.set('0', '0', ONE_THOUSAND_TOKENS, true, {from: adminAlice});
+      await this.staking.set('1', '150', ONE_THOUSAND_TOKENS, true, {from: adminAlice});
+
+      // check pending
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), '73333333333333333333'); // one block since cleared
+      assert.equal((await this.staking.pendingLpt(POOL_ONE, bob)).toString(), '46666666666666666666'); // zero left
+
+      await time.advanceBlockTo(this.startBlock.add(toBn('125')));
+
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), '73333333333333333333'); // one block since cleared
+      assert.equal((await this.staking.pendingLpt(POOL_ONE, bob)).toString(), '176666666666666666666'); // zero left
+
+      // trigger draw down on both
+      await this.staking.deposit(POOL_ZERO, '0', {from: bob});
+      await this.staking.deposit(POOL_ONE, '0', {from: bob});
+
+      await time.advanceBlockTo(this.startBlock.add(toBn('150')));
+
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), '0');
+      assert.equal((await this.staking.pendingLpt(POOL_ONE, bob)).toString(), '230000000000000000000');
+
+      await this.staking.withdraw(POOL_ZERO, '100', {from: bob});
+
+      // Deposit liquidity into pool 0
+      await this.xrp.approve(this.staking.address, '1000', {from: bob});
+      await this.staking.deposit(POOL_ONE, '50', {from: bob});
+
+      await time.advanceBlockTo(this.startBlock.add(toBn('210')));
+
+      // Deposit liquidity into pool 0
+      await this.xtp.approve(this.staking.address, '1000', {from: bob});
+      await this.staking.deposit(POOL_ZERO, '100', {from: bob});
+
+      assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), '0');
+      assert.equal((await this.staking.pendingLpt(POOL_ONE, bob)).toString(), '470000000000000000000');
+
+      await this.staking.withdraw(POOL_ONE, '100', {from: bob});
     });
 
     it('should reverts if exceeded token cap for deposits', async () => {

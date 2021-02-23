@@ -8,9 +8,9 @@ async function main() {
   );
 
   const tokenAddress = prompt('LPT token address? ');
-  const maxLPTRewards = prompt('Max LPT rewards amount? ');
-  const startBlock = prompt('Start block? ');
-  const endBlock = prompt('End block? ');
+  const maxLPTRewards = '8500000';
+  const startBlock = '11907635';
+  const endBlock = '12501221';
 
   console.log('LPT token', tokenAddress);
   console.log('Max LPT rewards', maxLPTRewards);
