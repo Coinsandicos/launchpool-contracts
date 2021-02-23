@@ -303,4 +303,94 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
       );
     });
   });
+
+  context('emergencyWithdraw()', async () => {
+
+    beforeEach(async () => {
+      this.launchPoolToken = await LaunchPoolToken.new(TEN_THOUSAND_TOKENS, launchPoolAdmin, {from: adminAlice});
+
+      this.startBlock = await time.latestBlock();
+      console.log('Starting block', this.startBlock.toString());
+
+      await setupUsers(this.launchPoolToken, launchPoolAdmin)
+    });
+
+    it('should allow emergency withdraw', async () => {
+
+      // 100 per block farming rate starting at block 100 with all issuance ending on block 200
+      this.staking = await LaunchPoolStakingWithGuild.new(
+        this.launchPoolToken.address,
+        to18DP('1000'), // 1k rewards = 10 rewards per block
+        this.startBlock.add(toBn('100')), // start mining block number
+        this.startBlock.add(toBn('200')), // end mining block number
+        {from: adminAlice}
+      );
+
+      const guildBankAddress = await this.staking.rewardGuildBank()
+
+      // transfer tokens to launch pool so they can be allocation accordingly
+      await this.launchPoolToken.transfer(guildBankAddress, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
+
+      // add the first and only pool
+      await this.staking.add('100', this.launchPoolToken.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
+
+      // Confirm reward per block
+      assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
+
+      // Deposit liquidity into pool
+      await this.launchPoolToken.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
+      await this.staking.deposit(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+      await time.advanceBlockTo(this.startBlock.add(toBn('89')));
+
+      // trigger pool update before block reward started, ensure all zeros still
+      await this.staking.updatePool(POOL_ZERO, {from: bob}); // block 90
+      await checkRewards(POOL_ZERO, bob, '0', '0');
+
+      // Move into block 110 to trigger 10 block reward
+      await time.advanceBlockTo(this.startBlock.add(toBn('110')));
+      await this.staking.deposit(POOL_ZERO, '0', {from: bob}); // claim them rewards!
+      await checkRewards(POOL_ZERO, bob, '110', '10', true);
+
+      // move blocks on further
+      await time.advanceBlockTo(this.startBlock.add(toBn('150')));
+      await checkRewards(POOL_ZERO, bob, '110', '390', false);
+
+      // trigger the reactor meltdown
+      await this.staking.emergencyWithdraw(POOL_ZERO, {from: bob});
+
+      // check pending goes to zero after emergency shut down
+      await checkRewards(POOL_ZERO, bob, '1110', '0', true);
+    });
+
+    it('should revert emergency withdraw with invalid pid', async () => {
+
+      // 100 per block farming rate starting at block 100 with all issuance ending on block 200
+      this.staking = await LaunchPoolStakingWithGuild.new(
+        this.launchPoolToken.address,
+        to18DP('1000'), // 1k rewards = 10 rewards per block
+        this.startBlock.add(toBn('100')), // start mining block number
+        this.startBlock.add(toBn('200')), // end mining block number
+        {from: adminAlice}
+      );
+
+      const guildBankAddress = await this.staking.rewardGuildBank()
+
+      // transfer tokens to launch pool so they can be allocation accordingly
+      await this.launchPoolToken.transfer(guildBankAddress, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
+
+      // add the first and only pool
+      await this.staking.add('100', this.launchPoolToken.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
+
+      // Deposit liquidity into pool
+      await this.launchPoolToken.approve(this.staking.address, '1000', {from: bob});
+      await this.staking.deposit(POOL_ZERO, '100', {from: bob});
+      await time.advanceBlockTo(this.startBlock.add(toBn('89')));
+
+      //  ooops
+      await expectRevert(
+        this.staking.emergencyWithdraw('1', {from: bob}),
+        'updatePool: invalid _pid'
+      );
+    });
+  });
 })
