@@ -21,7 +21,7 @@ async function main() {
   );
 
   const pools = [
-    [Math.trunc(10.2941 * 10000),  '0x2F85E11f6F12eaD6Af643F083a34E001030D2a6F', 10000000], // LPT/ETH UNI-V2
+    [Math.trunc(10.2941 * 10000), '0x2F85E11f6F12eaD6Af643F083a34E001030D2a6F', 10000000], // LPT/ETH UNI-V2
   ];
 
   console.log(`Adding ${pools.length} pools`);
