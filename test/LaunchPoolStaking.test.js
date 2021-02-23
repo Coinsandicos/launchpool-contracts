@@ -390,7 +390,7 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       assert.equal((await this.launchPoolToken.balanceOf(bob)).toString(), '999999999999999999999'); // balance stays same
     });
 
-    it.only('should issue reward tokens with two differently allocated pools, 1 person in each pool, and set one pool to zero', async () => {
+    it('should issue reward tokens with two differently allocated pools, 1 person in each pool, and set one pool to zero', async () => {
 
       ////////////////////////////////
       // 2 pools of equal weighting //

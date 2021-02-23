@@ -46,7 +46,7 @@ contract LaunchPoolStakingWithGuild is Ownable {
     }
 
     /// @notice Container for holding all rewards
-    Guild rewardGuildBank;
+    Guild public rewardGuildBank;
 
     /// @notice Number of LPT tokens distributed per block, across all pools.
     uint256 public lptPerBlock;
@@ -97,7 +97,7 @@ contract LaunchPoolStakingWithGuild is Ownable {
         uint256 numberOfBlocksForFarming = endBlock.sub(startBlock);
         lptPerBlock = maxLPTAvailableForFarming.div(numberOfBlocksForFarming);
 
-        rewardGuildBank = new Guild(address(_lpt), address(this));
+        rewardGuildBank = new Guild(IERC20(address(_lpt)), address(this));
     }
 
     /// @notice Returns the number of pools that have been added by the owner
