@@ -445,27 +445,36 @@ contract('LaunchPoolStaking', ([adminAlice, bob, carol, daniel, minter, referer,
       assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), '73333333333333333333'); // one block since cleared
       assert.equal((await this.staking.pendingLpt(POOL_ONE, bob)).toString(), '46666666666666666666'); // zero left
 
-      await time.advanceBlockTo(this.startBlock.add(toBn('210')));
+      await time.advanceBlockTo(this.startBlock.add(toBn('125')));
 
       assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), '73333333333333333333'); // one block since cleared
-      assert.equal((await this.staking.pendingLpt(POOL_ONE, bob)).toString(), '926666666666666666666'); // zero left
+      assert.equal((await this.staking.pendingLpt(POOL_ONE, bob)).toString(), '176666666666666666666'); // zero left
 
       // trigger draw down on both
       await this.staking.deposit(POOL_ZERO, '0', {from: bob});
       await this.staking.deposit(POOL_ONE, '0', {from: bob});
 
+      await time.advanceBlockTo(this.startBlock.add(toBn('150')));
+
       assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), '0');
-      assert.equal((await this.staking.pendingLpt(POOL_ONE, bob)).toString(), '0');
+      assert.equal((await this.staking.pendingLpt(POOL_ONE, bob)).toString(), '230000000000000000000');
+
+      await this.staking.withdraw(POOL_ZERO, '100', {from: bob});
+
+      // Deposit liquidity into pool 0
+      await this.xrp.approve(this.staking.address, '1000', {from: bob});
+      await this.staking.deposit(POOL_ONE, '50', {from: bob});
+
+      await time.advanceBlockTo(this.startBlock.add(toBn('210')));
 
       // Deposit liquidity into pool 0
       await this.xtp.approve(this.staking.address, '1000', {from: bob});
       await this.staking.deposit(POOL_ZERO, '100', {from: bob});
 
-      await this.staking.withdraw(POOL_ZERO, (await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), {from: bob});
-      await this.staking.withdraw(POOL_ONE, (await this.staking.pendingLpt(POOL_ONE, bob)).toString(), {from: bob});
-
       assert.equal((await this.staking.pendingLpt(POOL_ZERO, bob)).toString(), '0');
-      assert.equal((await this.staking.pendingLpt(POOL_ONE, bob)).toString(), '0');
+      assert.equal((await this.staking.pendingLpt(POOL_ONE, bob)).toString(), '470000000000000000000');
+
+      await this.staking.withdraw(POOL_ONE, '100', {from: bob});
     });
 
     it('should reverts if exceeded token cap for deposits', async () => {
