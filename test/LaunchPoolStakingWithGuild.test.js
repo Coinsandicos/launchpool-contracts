@@ -4,6 +4,7 @@ const LaunchPoolToken = artifacts.require('LaunchPoolToken');
 const LaunchPoolStakingWithGuild = artifacts.require('LaunchPoolStakingWithGuild');
 
 require('chai').should();
+const { expect } = require('chai')
 
 contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter, referer, launchPoolAdmin, whitelister]) => {
 
@@ -46,12 +47,15 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
     );
 
     const guildBankAddress = await this.staking.rewardGuildBank()
+    this.guildBankAddress = guildBankAddress
 
     // transfer tokens to launch pool so they can be allocation accordingly
     await this.launchPoolToken.transfer(guildBankAddress, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
 
     // Confirm reward per block
     assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
+
+    expect(await this.launchPoolToken.balanceOf(guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS)
 
     await setupUsers(this.launchPoolToken, launchPoolAdmin)
   })
@@ -65,9 +69,15 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
     })
 
     it('rewards are correct', async () => {
+      expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS)
+
       // Deposit liquidity into pool
       await this.launchPoolToken.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
       await this.staking.deposit(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+
+      expect(await this.launchPoolToken.balanceOf(this.staking.address)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS)
+      expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS)
+
       await time.advanceBlockTo(this.startBlock.add(toBn('89')));
 
       // Move into block 110 to trigger 10 block reward
