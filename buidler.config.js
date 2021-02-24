@@ -22,6 +22,11 @@ module.exports = {
     enabled: false
   },
   networks: {
+    sandbox: {
+      chainId: 1337,
+      url: 'https://sandbox.truffleteams.com/13b025b8-0867-47fb-9c13-0c8c1aa22b20',
+      accounts: [`${PRIVATE_KEY}`]
+    },
     // mainnet: {
     //   gasPrice: 158000000000, // 158 gwei
     //   url: `https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}`,
