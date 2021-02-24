@@ -7,10 +7,10 @@ async function main() {
     await deployer.getAddress()
   );
 
-  const tokenAddress = prompt('LPT token address? ');
-  const maxLPTRewards = prompt('Max $LPOOL rewards? ');
-  const startBlock = prompt('Start block? ');
-  const endBlock = prompt('End block? ');
+  const tokenAddress = prompt('LPT token address? '); // 0x6149C26Cd2f7b5CCdb32029aF817123F6E37Df5B
+  const maxLPTRewards = prompt('Max $LPOOL rewards? '); // 242054.6475 $LPOOL
+  const startBlock = prompt('Start block? '); // 11926500
+  const endBlock = prompt('End block? '); // 12501221
 
   console.log('LPT token', tokenAddress);
   console.log('Max LPT rewards', maxLPTRewards);

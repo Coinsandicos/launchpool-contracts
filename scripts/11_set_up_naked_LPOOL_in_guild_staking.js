@@ -20,6 +20,8 @@ async function main() {
     deployer //provider
   );
 
+  // 0x6149c26cd2f7b5ccdb32029af817123f6e37df5b
+
   const pools = [
     [100, '0x6149C26Cd2f7b5CCdb32029aF817123F6E37Df5B', 10000000], // $LPOOL
   ];

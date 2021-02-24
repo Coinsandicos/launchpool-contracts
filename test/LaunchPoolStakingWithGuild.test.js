@@ -4,7 +4,7 @@ const LaunchPoolToken = artifacts.require('LaunchPoolToken');
 const LaunchPoolStakingWithGuild = artifacts.require('LaunchPoolStakingWithGuild');
 
 require('chai').should();
-const { expect } = require('chai')
+const {expect} = require('chai');
 
 contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter, referer, launchPoolAdmin, whitelister]) => {
 
@@ -28,6 +28,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
     assert.equal((await this.staking.pendingLpt(pool, from)).toString(), to18DP(lptPendingBalance).toString());
   };
 
+  const TEN_TOKENS = to18DP('10');
   const ONE_THOUSAND_TOKENS = to18DP('1000');
   const TEN_THOUSAND_TOKENS = to18DP('10000');
 
@@ -46,8 +47,8 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
       {from: adminAlice}
     );
 
-    const guildBankAddress = await this.staking.rewardGuildBank()
-    this.guildBankAddress = guildBankAddress
+    const guildBankAddress = await this.staking.rewardGuildBank();
+    this.guildBankAddress = guildBankAddress;
 
     // transfer tokens to launch pool so they can be allocation accordingly
     await this.launchPoolToken.transfer(guildBankAddress, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
@@ -55,28 +56,28 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
     // Confirm reward per block
     assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
 
-    expect(await this.launchPoolToken.balanceOf(guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS)
+    expect(await this.launchPoolToken.balanceOf(guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
 
-    await setupUsers(this.launchPoolToken, launchPoolAdmin)
-  })
+    await setupUsers(this.launchPoolToken, launchPoolAdmin);
+  });
 
   describe('When staking token is the same as reward token (both $LPOOL)', () => {
-    const depositAmount = new BN('100')
+    const depositAmount = new BN('100');
 
     beforeEach(async () => {
       // add the first and only pool
       await this.staking.add(depositAmount, this.launchPoolToken.address, ONE_THOUSAND_TOKENS, false, {from: adminAlice});
-    })
+    });
 
     it('rewards are correct', async () => {
-      expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS)
+      expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
 
       // Deposit liquidity into pool
       await this.launchPoolToken.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
       await this.staking.deposit(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
 
-      expect(await this.launchPoolToken.balanceOf(this.staking.address)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS)
-      expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS)
+      expect(await this.launchPoolToken.balanceOf(this.staking.address)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
+      expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
 
       await time.advanceBlockTo(this.startBlock.add(toBn('89')));
 
@@ -111,8 +112,70 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
 
       // balance stays same
       await checkRewards(POOL_ZERO, bob, '1000', '0', false);
-    })
-  })
+    });
+
+    it.only('usecase testing', async () => {
+      expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
+
+      // Deposit liquidity into pool
+      await this.launchPoolToken.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
+      await this.staking.deposit(POOL_ZERO, TEN_TOKENS, {from: bob});
+
+      expect(await this.launchPoolToken.balanceOf(this.staking.address)).to.be.bignumber.equal(TEN_TOKENS);
+      expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
+
+      await time.advanceBlockTo(this.startBlock.add(toBn('89')));
+
+      await checkRewards(POOL_ZERO, bob, '990', '0', false);
+
+      // Move into block 110 to trigger 10 block reward
+      await time.advanceBlockTo(this.startBlock.add(toBn('110')));
+      await checkRewards(POOL_ZERO, bob, '990', '100', false); // 10 blocks x 10
+
+      await this.staking.deposit(POOL_ZERO, TEN_TOKENS, {from: bob});
+
+      expect(await this.launchPoolToken.balanceOf(this.staking.address)).to.be.bignumber.equal(TEN_TOKENS.add(TEN_TOKENS));
+      expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS.sub(to18DP('110')));
+
+      // Move into block 120 to trigger 10 block reward - pays rewards
+      await time.advanceBlockTo(this.startBlock.add(toBn('120')));
+      await checkRewards(POOL_ZERO, bob, '1090', '90', false); // 10 blocks x 10
+
+      await this.staking.withdraw(POOL_ZERO, TEN_TOKENS, {from: bob});
+
+      // Move into block 130 to trigger 10 block reward - pays rewards for unstake too
+      await time.advanceBlockTo(this.startBlock.add(toBn('130')));
+      await checkRewards(POOL_ZERO, bob, '1200', '90', false); // 10 blocks x 10
+
+      // for master-chef to trigger a pending payment you deposit a zero amount
+      // this updates the internal balances and pays any owed reward tokens
+      await this.staking.deposit(POOL_ZERO, '0', {from: bob});
+      await checkRewards(POOL_ZERO, bob, '110', '0', false); // moved 10 + 1 for execution = 11 blocks past
+
+      // move to block before end time
+      await time.advanceBlockTo(this.startBlock.add(toBn('199')));
+      await checkRewards(POOL_ZERO, bob, '110', '880', false); // 88 due 11 blocks which are already claimed
+
+      // Claim them on block 200
+      await this.staking.deposit(POOL_ZERO, '0', {from: bob});
+      assert.equal((await time.latestBlock()).toString(), this.startBlock.add(toBn('200'))); // confirm now on the cusp
+
+      // all claims 100 X 10 = 1000
+      // no remaining lpt
+      await checkRewards(POOL_ZERO, bob, '1000', '0', false);
+
+      // move after closed
+      await time.advanceBlockTo(this.startBlock.add(toBn('201')));
+      // still no remaining lpt
+      await checkRewards(POOL_ZERO, bob, '1000', '0', false);
+
+      // no change after claiming
+      await this.staking.deposit(POOL_ZERO, '0', {from: bob});
+
+      // balance stays same
+      await checkRewards(POOL_ZERO, bob, '1000', '0', false);
+    });
+  });
 
   context('withdraw()', async () => {
 
@@ -155,7 +218,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
         {from: adminAlice}
       );
 
-      const guildBankAddress = await this.staking.rewardGuildBank()
+      const guildBankAddress = await this.staking.rewardGuildBank();
 
       // transfer tokens to launch pool so they can be allocation accordingly
       await this.launchPoolToken.transfer(guildBankAddress, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
@@ -190,7 +253,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
         {from: adminAlice}
       );
 
-      const guildBankAddress = await this.staking.rewardGuildBank()
+      const guildBankAddress = await this.staking.rewardGuildBank();
 
       // transfer tokens to launch pool so they can be allocation accordingly
       await this.launchPoolToken.transfer(guildBankAddress, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
@@ -232,7 +295,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
         {from: adminAlice}
       );
 
-      const guildBankAddress = await this.staking.rewardGuildBank()
+      const guildBankAddress = await this.staking.rewardGuildBank();
 
       // transfer tokens to launch pool so they can be allocation accordingly
       await this.launchPoolToken.transfer(guildBankAddress, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
@@ -240,7 +303,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
       // Confirm reward per block
       assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
 
-      await setupUsers(this.launchPoolToken, launchPoolAdmin)
+      await setupUsers(this.launchPoolToken, launchPoolAdmin);
     });
 
     it('can not "add" if not owner', async () => {
@@ -272,7 +335,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
     });
 
     it('can not "set" if token cap is zero', async () => {
-      await this.staking.add('100', this.staking.address, toBn('5'), true, {from: adminAlice})
+      await this.staking.add('100', this.staking.address, toBn('5'), true, {from: adminAlice});
       await expectRevert(
         this.staking.set(POOL_ZERO, '100', toBn('0'), true, {from: adminAlice}),
         'set: _maxStakingAmountPerUser must be greater than zero'
@@ -326,7 +389,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
       this.startBlock = await time.latestBlock();
       console.log('Starting block', this.startBlock.toString());
 
-      await setupUsers(this.launchPoolToken, launchPoolAdmin)
+      await setupUsers(this.launchPoolToken, launchPoolAdmin);
     });
 
     it('should allow emergency withdraw', async () => {
@@ -340,7 +403,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
         {from: adminAlice}
       );
 
-      const guildBankAddress = await this.staking.rewardGuildBank()
+      const guildBankAddress = await this.staking.rewardGuildBank();
 
       // transfer tokens to launch pool so they can be allocation accordingly
       await this.launchPoolToken.transfer(guildBankAddress, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
@@ -387,7 +450,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
         {from: adminAlice}
       );
 
-      const guildBankAddress = await this.staking.rewardGuildBank()
+      const guildBankAddress = await this.staking.rewardGuildBank();
 
       // transfer tokens to launch pool so they can be allocation accordingly
       await this.launchPoolToken.transfer(guildBankAddress, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
@@ -407,4 +470,4 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
       );
     });
   });
-})
+});
