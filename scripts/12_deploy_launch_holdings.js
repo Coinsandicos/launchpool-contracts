@@ -19,7 +19,7 @@ async function main() {
 
   prompt('If happy, hit enter...');
 
-  const LaunchHoldingsFactory = await ethers.getContractFactory("LaunchHoldings");
+  const LaunchHoldingsFactory = await ethers.getContractFactory("HoldingToken");
 
   const holdingToken = await LaunchHoldingsFactory.deploy(
     tokenName,
