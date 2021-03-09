@@ -24,7 +24,7 @@ async function main() {
   const holdingToken = await LaunchHoldingsFactory.deploy(
     tokenName,
     tokenSymbol,
-    ethers.utils.parseEther(initialSupply),
+    initialSupply,
     initialSupplyRecipient
   );
 
