@@ -7,10 +7,10 @@ async function main() {
     await deployer.getAddress()
   );
 
-  const tokenName = prompt('Token name? ');
-  const tokenSymbol = prompt('Token symbol? ');
-  const initialSupply = prompt('Initial supply? ');
-  const initialSupplyRecipient = prompt('Initial supply recipient? ');
+  const tokenName = prompt('Token name? '); // PredictX Holding Token
+  const tokenSymbol = prompt('Token symbol? '); // LPH1
+  const initialSupply = prompt('Initial supply? '); // 100000
+  const initialSupplyRecipient = prompt('Initial supply recipient? '); // deployer
 
   console.log('Token name', tokenName);
   console.log('Token symbol', tokenSymbol);

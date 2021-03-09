@@ -7,10 +7,10 @@ async function main() {
     await deployer.getAddress()
   );
 
-  const tokenAddress = prompt('Token address? ');
-  const maxRewards = prompt('Max rewards? ');
-  const startBlock = prompt('Start block? ');
-  const endBlock = prompt('End block? ');
+  const tokenAddress = prompt('Token address? '); // TBC
+  const maxRewards = prompt('Max rewards? '); // 100000
+  const startBlock = prompt('Start block? '); // 12011195 - https://etherscan.io/block/countdown/12011195
+  const endBlock = prompt('End block? '); // 12023650 - https://etherscan.io/block/countdown/12023650
 
   console.log('Token address', tokenAddress);
   console.log('Max rewards', maxRewards);
