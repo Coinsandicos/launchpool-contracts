@@ -114,7 +114,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
       await checkRewards(POOL_ZERO, bob, '1000', '0', false);
     });
 
-    it.only('usecase testing', async () => {
+    it.skip('usecase testing', async () => {
       expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
 
       // Deposit liquidity into pool
