@@ -8,7 +8,7 @@ async function main() {
   );
 
   const tokenAddress = prompt('Token address? '); // 0xF94b5C5651c888d928439aB6514B93944eEE6F48 - Yield
-  const maxRewards = prompt('Max rewards? '); // 1500000 - 1.5 million
+  const maxRewards = prompt('Max rewards? '); // 500000 - 500k
   const startBlock = prompt('Start block? '); // 12043400 - https://etherscan.io/block/countdown/12043400
   const endBlock = prompt('End block? '); // 12253000 - https://etherscan.io/block/countdown/12253000
 
