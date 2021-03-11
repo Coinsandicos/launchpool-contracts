@@ -24,8 +24,8 @@ async function main() {
 
   const pools = [
     [100, lpoolTokenAddress, 50], // staking limit of 50 LPOOL
-    [100, lpoolTokenAddress, 250], // staking limit of 250 LPOOL
-    [100, lpoolTokenAddress, 10000000], // staking limit of 10mil LPOOL
+   //[100, lpoolTokenAddress, 250], // staking limit of 250 LPOOL
+    //[100, lpoolTokenAddress, 10000000], // staking limit of 10mil LPOOL
   ];
 
   console.log(`Adding ${pools.length} pools`);
