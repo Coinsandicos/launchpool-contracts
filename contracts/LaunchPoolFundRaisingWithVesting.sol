@@ -8,7 +8,7 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import { Guild } from "./Guild.sol";
+import { FundRaisingGuild } from "./FundRaisingGuild.sol";
 
 /// @title Fund raising platform facilitated by launch pool
 /// @author BlockRocket.tech
@@ -43,13 +43,14 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         uint256 accRewardPerShare; // Per LP token staked, how much reward token earned in pool that users will get
         uint256 maxRewardTokenAvailableForVesting;
         uint256 targetRaise;
+        uint256 totalStaked;
     }
 
     /// @notice staking token is fixed for all pools
     IERC20 public stakingToken;
 
     /// @notice Container for holding all rewards
-    Guild public rewardGuildBank;
+    FundRaisingGuild public rewardGuildBank;
 
     /// @notice List of pools that users can stake into
     PoolInfo[] public poolInfo;
@@ -76,7 +77,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 //        uint256 numberOfBlocksForFarming = endBlock.sub(startBlock);
 //        rewardPerBlock = maxRewardTokenAvailableForFarming.div(numberOfBlocksForFarming);
 
-        rewardGuildBank = new Guild(address(this));
+        rewardGuildBank = new FundRaisingGuild(address(this));
 
         //todo deploy event
     }
@@ -89,10 +90,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 
     /// @notice Create a new reward pool by whitelisting a new ERC20 token.
     /// @dev Can only be called by the contract owner
-    /// @param _allocPoint Governs what percentage of the total rewards this pool and other pools will get
-    /// @param _erc20Token Address of the staking token being whitelisted
-    /// @param _maxStakingAmountPerUser For this pool, maximum amount per user that can be staked
-    /// @param _withUpdate Set to true for updating all pools before adding this one
     function add(IERC20 _rewardToken, uint256 _stakingEndBlock, uint256 _depositEndBlock, uint256 _targetRaise, bool _withUpdate) public onlyOwner {
         address rewardTokenAddress = address(_rewardToken);
         require(rewardTokenAddress != address(0), "add: _rewardToken must not be zero address");
@@ -112,31 +109,32 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
             rewardEndBlock: 0,
             accRewardPerShare: 0,
             maxRewardTokenAvailableForVesting: 0,
-            targetRaise: _targetRaise
+            targetRaise: _targetRaise,
+            totalStaked: 0
         }));
     }
 
-    /// @notice Update a pool's allocation point to increase or decrease its share of contract-level rewards
-    /// @notice Can also update the max amount that can be staked per user
-    /// @dev Can only be called by the owner
-    /// @param _pid ID of the pool being updated
-    /// @param _allocPoint New allocation point
-    /// @param _maxStakingAmountPerUser Maximum amount that a user can deposit into the far
-    /// @param _withUpdate Set to true if you want to update all pools before making this change - it will checkpoint those rewards
-    function set(uint256 _pid, uint256 _allocPoint, uint256 _maxStakingAmountPerUser, bool _withUpdate) public onlyOwner {
-        require(block.number < endBlock, "set: must be before end");
-        require(_pid < poolInfo.length, "set: invalid _pid");
-        require(_maxStakingAmountPerUser > 0, "set: _maxStakingAmountPerUser must be greater than zero");
-
-        if (_withUpdate) {
-            massUpdatePools();
-        }
-
-        totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(_allocPoint);
-
-        poolInfo[_pid].allocPoint = _allocPoint;
-        poolInfo[_pid].maxStakingAmountPerUser = _maxStakingAmountPerUser;
-    }
+//    /// @notice Update a pool's allocation point to increase or decrease its share of contract-level rewards
+//    /// @notice Can also update the max amount that can be staked per user
+//    /// @dev Can only be called by the owner
+//    /// @param _pid ID of the pool being updated
+//    /// @param _allocPoint New allocation point
+//    /// @param _maxStakingAmountPerUser Maximum amount that a user can deposit into the far
+//    /// @param _withUpdate Set to true if you want to update all pools before making this change - it will checkpoint those rewards
+//    function set(uint256 _pid, uint256 _allocPoint, uint256 _maxStakingAmountPerUser, bool _withUpdate) public onlyOwner {
+//        require(block.number < endBlock, "set: must be before end");
+//        require(_pid < poolInfo.length, "set: invalid _pid");
+//        require(_maxStakingAmountPerUser > 0, "set: _maxStakingAmountPerUser must be greater than zero");
+//
+//        if (_withUpdate) {
+//            massUpdatePools();
+//        }
+//
+//        totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(_allocPoint);
+//
+//        poolInfo[_pid].allocPoint = _allocPoint;
+//        poolInfo[_pid].maxStakingAmountPerUser = _maxStakingAmountPerUser;
+//    }
 
     /// @notice View function to see pending and unclaimed reward tokens for a given user
     /// @param _pid ID of the pool where a user has a stake
@@ -149,13 +147,12 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         UserInfo storage user = userInfo[_pid][_user];
 
         uint256 accRewardPerShare = pool.accRewardPerShare;
-        uint256 lpSupply = pool.erc20Token.balanceOf(address(this));
 
-        if (block.number > pool.lastRewardBlock && lpSupply != 0) {
-            uint256 maxEndBlock = block.number <= endBlock ? block.number : endBlock;
+        if (block.number > pool.lastRewardBlock && pool.rewardEndBlock != 0 && pool.totalStaked != 0) {
+            uint256 maxEndBlock = block.number <= pool.rewardEndBlock ? block.number : pool.rewardEndBlock;
             uint256 multiplier = getMultiplier(pool.lastRewardBlock, maxEndBlock);
-            uint256 reward = multiplier.mul(rewardPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-            accRewardPerShare = accRewardPerShare.add(reward.mul(1e18).div(lpSupply));
+            uint256 reward = multiplier.mul(pool.rewardPerBlock);
+            accRewardPerShare = accRewardPerShare.add(reward.mul(1e18).div(pool.totalStaked));
         }
 
         return user.amount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebt);
@@ -164,7 +161,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
     /// @notice Cycles through the pools to update all of the rewards accrued
     function massUpdatePools() public {
         uint256 length = poolInfo.length;
-        for (uint256 pid = 0; pid < length; ++pid) {
+        for (uint256 pid = 0; pid < length; pid++) {
             updatePool(pid);
         }
     }
@@ -175,17 +172,17 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         require(_pid < poolInfo.length, "updatePool: invalid _pid");
 
         PoolInfo storage pool = poolInfo[_pid];
-        if (block.number <= pool.lastRewardBlock) {
+        if (pool.rewardEndBlock == 0) { // client has not sent rewards
             return;
         }
 
-        uint256 erc20Supply = pool.erc20Token.balanceOf(address(this));
-        if (erc20Supply == 0) {
-            pool.lastRewardBlock = block.number;
-            return;
-        }
+//        uint256 erc20Supply = pool.erc20Token.balanceOf(address(this));
+//        if (erc20Supply == 0) {
+//            pool.lastRewardBlock = block.number;
+//            return;
+//        }
 
-        uint256 maxEndBlock = block.number <= endBlock ? block.number : endBlock;
+        uint256 maxEndBlock = block.number <= pool.rewardEndBlock ? block.number : pool.rewardEndBlock;
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, maxEndBlock);
 
         // No point in doing any more logic as the rewards have ended
@@ -193,20 +190,18 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
             return;
         }
 
-        uint256 reward = multiplier.mul(rewardPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+        uint256 reward = multiplier.mul(pool.rewardPerBlock);
 
-        pool.accRewardPerShare = pool.accRewardPerShare.add(reward.mul(1e18).div(erc20Supply));
+        pool.accRewardPerShare = pool.accRewardPerShare.add(reward.mul(1e18).div(pool.totalStaked));
         pool.lastRewardBlock = maxEndBlock;
     }
 
     /// @notice Where any user can stake their ERC20 tokens into a pool in order to farm rewards
     /// @param _pid ID of the pool
     /// @param _amount Amount of ERC20 being staked
-    function deposit(uint256 _pid, uint256 _amount) external {
+    function deposit(uint256 _pid, uint256 _amount) external { //non reentrant?
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
-
-        require(user.amount.add(_amount) <= pool.maxStakingAmountPerUser, "deposit: can not exceed max staking amount per user");
 
         updatePool(_pid);
 
@@ -218,8 +213,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         }
 
         if (_amount > 0) {
-            pool.erc20Token.safeTransferFrom(address(msg.sender), address(this), _amount);
             user.amount = user.amount.add(_amount);
+            pool.totalStaked = pool.totalStaked.add(_amount);
+            pool.erc20Token.safeTransferFrom(address(msg.sender), address(this), _amount);
         }
 
         user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
@@ -245,6 +241,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 
         if (_amount > 0) {
             user.amount = user.amount.sub(_amount);
+            pool.totalStaked = pool.totalStaked.sub(_amount);
             pool.erc20Token.safeTransfer(address(msg.sender), _amount);
         }
 
@@ -264,6 +261,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         user.amount = 0;
         user.rewardDebt = 0;
 
+        pool.totalStaked = pool.totalStaked.sub(amount);
         pool.erc20Token.safeTransfer(address(msg.sender), amount);
         //emit EmergencyWithdraw(msg.sender, _pid, amount);
     }
