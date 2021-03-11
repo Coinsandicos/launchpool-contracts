@@ -208,14 +208,14 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         if (user.amount > 0) {
             uint256 pending = user.amount.mul(pool.accRewardPerShare).div(1e18).sub(user.rewardDebt);
             if (pending > 0) {
-                safeRewardTransfer(msg.sender, pending);
+                safeRewardTransfer(pool.rewardToken, msg.sender, pending);
             }
         }
 
         if (_amount > 0) {
             user.amount = user.amount.add(_amount);
             pool.totalStaked = pool.totalStaked.add(_amount);
-            pool.erc20Token.safeTransferFrom(address(msg.sender), address(this), _amount);
+            stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
         }
 
         user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
@@ -236,49 +236,48 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 
         uint256 pending = user.amount.mul(pool.accRewardPerShare).div(1e18).sub(user.rewardDebt);
         if (pending > 0) {
-            safeRewardTransfer(msg.sender, pending);
+            safeRewardTransfer(pool.rewardToken, msg.sender, pending);
         }
 
         if (_amount > 0) {
             user.amount = user.amount.sub(_amount);
             pool.totalStaked = pool.totalStaked.sub(_amount);
-            pool.erc20Token.safeTransfer(address(msg.sender), _amount);
+            stakingToken.safeTransfer(address(msg.sender), _amount);
         }
 
         user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
         //emit Withdraw(msg.sender, _pid, _amount);
     }
 
-    /// @notice Emergency only. Should the rewards issuance mechanism fail, people can still withdraw their stake
-    /// @param _pid Pool ID
-    function emergencyWithdraw(uint256 _pid) external {
-        require(_pid < poolInfo.length, "updatePool: invalid _pid");
-
-        PoolInfo storage pool = poolInfo[_pid];
-        UserInfo storage user = userInfo[_pid][msg.sender];
-
-        uint256 amount = user.amount;
-        user.amount = 0;
-        user.rewardDebt = 0;
-
-        pool.totalStaked = pool.totalStaked.sub(amount);
-        pool.erc20Token.safeTransfer(address(msg.sender), amount);
-        //emit EmergencyWithdraw(msg.sender, _pid, amount);
-    }
+//    /// @notice Emergency only. Should the rewards issuance mechanism fail, people can still withdraw their stake
+//    /// @param _pid Pool ID
+//    function emergencyWithdraw(uint256 _pid) external {
+//        require(_pid < poolInfo.length, "updatePool: invalid _pid");
+//
+//        PoolInfo storage pool = poolInfo[_pid];
+//        UserInfo storage user = userInfo[_pid][msg.sender];
+//
+//        uint256 amount = user.amount;
+//        user.amount = 0;
+//        user.rewardDebt = 0;
+//
+//        pool.totalStaked = pool.totalStaked.sub(amount);
+//        stakingToken.safeTransfer(address(msg.sender), amount);
+//        //emit EmergencyWithdraw(msg.sender, _pid, amount);
+//    }
 
     ////////////
     // Private /
     ////////////
 
     /// @dev Safe reward transfer function, just in case if rounding error causes pool to not have enough rewards.
-    /// @param _to Whom to send reward into
-    /// @param _amount of reward to send
-    function safeRewardTransfer(address _to, uint256 _amount) private {
-        uint256 bal = rewardGuildBank.tokenBalance();
+
+    function safeRewardTransfer(IERC20 _rewardToken, address _to, uint256 _amount) private {
+        uint256 bal = rewardGuildBank.tokenBalance(_rewardToken);
         if (_amount > bal) {
-            rewardGuildBank.withdrawTo(_to, bal);
+            rewardGuildBank.withdrawTo(_rewardToken, _to, bal);
         } else {
-            rewardGuildBank.withdrawTo(_to, _amount);
+            rewardGuildBank.withdrawTo(_rewardToken, _to, _amount);
         }
     }
 
