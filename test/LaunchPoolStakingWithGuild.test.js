@@ -114,6 +114,26 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
       await checkRewards(POOL_ZERO, bob, '1000', '0', false);
     });
 
+    it('Can stake, unstake and restake', async () => {
+      // Deposit liquidity into pool
+      await this.launchPoolToken.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
+      await this.staking.deposit(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+
+      expect(await this.launchPoolToken.balanceOf(this.staking.address)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
+      expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
+
+      await this.staking.withdraw(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+
+      await this.launchPoolToken.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
+      await this.staking.deposit(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+
+      await this.staking.withdraw(POOL_ZERO, ONE_THOUSAND_TOKENS.divn(2), {from: bob});
+      await this.staking.withdraw(POOL_ZERO, ONE_THOUSAND_TOKENS.divn(2), {from: bob});
+
+      await this.launchPoolToken.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
+      await this.staking.deposit(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+    })
+
     it.skip('usecase testing', async () => {
       expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
 
