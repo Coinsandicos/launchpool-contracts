@@ -61,9 +61,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
     /// @notice The block number when rewards starts across all pools.
     //uint256 public startBlock;
 
-    /// @notice Tracks ERC20 tokens added by owner
-    mapping(address => bool) isPoolSetUp;
-
     //event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     //event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     //event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
@@ -79,8 +76,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 //        uint256 numberOfBlocksForFarming = endBlock.sub(startBlock);
 //        rewardPerBlock = maxRewardTokenAvailableForFarming.div(numberOfBlocksForFarming);
 
-        // todo: support multiple tokens pls
-        rewardGuildBank = new Guild(IERC20(address(_rewardToken)), address(this));
+        rewardGuildBank = new Guild(address(this));
+
+        //todo deploy event
     }
 
     /// @notice Returns the number of pools that have been added by the owner
@@ -95,28 +93,27 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
     /// @param _erc20Token Address of the staking token being whitelisted
     /// @param _maxStakingAmountPerUser For this pool, maximum amount per user that can be staked
     /// @param _withUpdate Set to true for updating all pools before adding this one
-    function add(uint256 _allocPoint, IERC20 _erc20Token, uint256 _maxStakingAmountPerUser, bool _withUpdate) public onlyOwner {
-        require(block.number < endBlock, "add: must be before end");
-        address erc20TokenAddress = address(_erc20Token);
-        require(erc20TokenAddress != address(0), "add: _erc20Token must not be zero address");
-        require(isErc20TokenWhitelisted[erc20TokenAddress] == false, "add: already whitelisted");
-        require(_maxStakingAmountPerUser > 0, "add: _maxStakingAmountPerUser must be greater than zero");
+    function add(IERC20 _rewardToken, uint256 _stakingEndBlock, uint256 _depositEndBlock, uint256 _targetRaise, bool _withUpdate) public onlyOwner {
+        address rewardTokenAddress = address(_rewardToken);
+        require(rewardTokenAddress != address(0), "add: _rewardToken must not be zero address");
 
         if (_withUpdate) {
             massUpdatePools();
         }
 
-        uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
-        totalAllocPoint = totalAllocPoint.add(_allocPoint);
-        poolInfo.push(PoolInfo({
-            erc20Token : _erc20Token,
-            allocPoint : _allocPoint,
-            lastRewardBlock : lastRewardBlock,
-            accRewardPerShare : 0,
-            maxStakingAmountPerUser: _maxStakingAmountPerUser
-        }));
+        //uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
 
-        isErc20TokenWhitelisted[erc20TokenAddress] = true;
+        poolInfo.push(PoolInfo({
+            rewardToken : _rewardToken,
+            rewardPerBlock: 0,
+            stakingEndBlock: _stakingEndBlock,
+            depositEndBlock: _depositEndBlock,
+            lastRewardBlock: 0,
+            rewardEndBlock: 0,
+            accRewardPerShare: 0,
+            maxRewardTokenAvailableForVesting: 0,
+            targetRaise: _targetRaise
+        }));
     }
 
     /// @notice Update a pool's allocation point to increase or decrease its share of contract-level rewards
@@ -226,7 +223,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         }
 
         user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
-        emit Deposit(msg.sender, _pid, _amount);
+        //emit Deposit(msg.sender, _pid, _amount);
     }
 
     /// @notice Allows a user to withdraw any ERC20 tokens staked in a pool
@@ -252,7 +249,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         }
 
         user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
-        emit Withdraw(msg.sender, _pid, _amount);
+        //emit Withdraw(msg.sender, _pid, _amount);
     }
 
     /// @notice Emergency only. Should the rewards issuance mechanism fail, people can still withdraw their stake
@@ -268,7 +265,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         user.rewardDebt = 0;
 
         pool.erc20Token.safeTransfer(address(msg.sender), amount);
-        emit EmergencyWithdraw(msg.sender, _pid, amount);
+        //emit EmergencyWithdraw(msg.sender, _pid, amount);
     }
 
     ////////////
