@@ -7,7 +7,11 @@ const MockERC20 = artifacts.require('MockERC20');
 require('chai').should();
 const {expect} = require('chai');
 
+const {fromWei} = require('web3-utils');
+
 contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, project1Admin]) => {
+  const shouldBeNumberInEtherCloseTo = (valInWei, expected) => parseFloat(fromWei(valInWei)).should.be.closeTo(parseFloat(expected.toString()), 0.000001);
+
   const to18DP = (value) => {
     return new BN(value).mul(new BN('10').pow(new BN('18')));
   };
@@ -124,6 +128,12 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
 
         // move past funding period
         await time.advanceBlockTo(this.pledgeFundingEndBlock.add(toBn('1')));
+
+        // 100% funding will have taken place
+        const {raised, target} = await this.fundRaising.getTotalRaisedVsTarget(POOL_ZERO)
+        shouldBeNumberInEtherCloseTo(raised, fromWei(target))
+
+
       })
 
       describe('When another pool is set up', () => {

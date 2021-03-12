@@ -203,8 +203,8 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     }
 
     // pre-step 3 for project
-    function getTotalRaised(uint256 _pid) external view returns (uint256) {
-        return poolInfo[_pid].totalRaised;
+    function getTotalRaisedVsTarget(uint256 _pid) external view returns (uint256 raised, uint256 target) {
+        return (poolInfo[_pid].totalRaised, poolInfo[_pid].targetRaise);
     }
 
     // step 3
