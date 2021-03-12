@@ -5,6 +5,7 @@ pragma solidity 0.6.12;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -14,7 +15,7 @@ import { FundRaisingGuild } from "./FundRaisingGuild.sol";
 /// @author BlockRocket.tech
 /// @notice Fork of MasterChef.sol from SushiSwap
 /// @dev Only the owner can add new pools
-contract LaunchPoolFundRaisingWithVesting is Ownable {
+contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -64,12 +65,14 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
     /// @notice Pool ID => User Address => User Info
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
 
-    /// @notice The block number when rewards starts across all pools.
-    //uint256 public startBlock;
-
-    //event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
-    //event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
-    //event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
+    event ContractDeployed();
+    event PoolAdded(uint256 indexed pid);
+    event Pledge(address indexed user, uint256 indexed pid, uint256 amount);
+    event PledgeFunded(address indexed user, uint256 indexed pid, uint256 amount);
+    event RewardsSetUp(uint256 indexed pid, uint256 amount, uint256 rewardEndBlock);
+    event RewardClaimed(address indexed user, uint256 indexed pid, uint256 amount);
+    event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
+    event FundRaisingClaimed(uint256 indexed pid, address indexed recipient, uint256 amount);
 
     /// @param _stakingToken Address of the staking token for all pools
     constructor(IERC20 _stakingToken) public {
@@ -77,7 +80,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 
         rewardGuildBank = new FundRaisingGuild(address(this));
 
-        //todo deploy event
+        emit ContractDeployed();
     }
 
     /// @notice Returns the number of pools that have been added by the owner
@@ -123,6 +126,8 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
             fundRaisingRecipient: _fundRaisingRecipient,
             fundsClaimed: false
         }));
+
+        emit PoolAdded(poolInfo.length.sub(1));
     }
 
     // todo define what can be updated
@@ -149,7 +154,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 //    }
 
     // step 1
-    function pledge(uint256 _pid, uint256 _amount) external { //non reentrant?
+    function pledge(uint256 _pid, uint256 _amount) external nonReentrant {
         require(_pid < poolInfo.length, "pledge: Invalid PID");
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -162,8 +167,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 
         stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
 
-        // todo emit pledge
-        //emit Deposit(msg.sender, _pid, _amount);
+        emit Pledge(msg.sender, _pid, _amount);
     }
 
     // pre-step 2 for staker
@@ -179,7 +183,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
     }
 
     // step 2
-    function fundPledge(uint256 _pid) external payable {
+    function fundPledge(uint256 _pid) external payable nonReentrant {
         require(_pid < poolInfo.length, "fundPledge: Invalid PID");
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -194,16 +198,16 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 
         pool.totalStakeThatHasFundedPledge = pool.totalStakeThatHasFundedPledge.add(user.amount);
 
-        // todo event
+        emit PledgeFunded(msg.sender, _pid, msg.value);
     }
 
-    // pre-step 3 for client
+    // pre-step 3 for project
     function getTotalRaised(uint256 _pid) external view returns (uint256) {
         return poolInfo[_pid].totalRaised;
     }
 
     // step 3
-    function setupVestingRewards(uint256 _pid, uint256 _rewardAmount, uint256 _rewardEndBlock) external { //todo nonreentrant
+    function setupVestingRewards(uint256 _pid, uint256 _rewardAmount, uint256 _rewardEndBlock) external nonReentrant {
         require(_pid < poolInfo.length, "setupVestingRewards: Invalid PID");
         require(_rewardEndBlock > block.number, "setupVestingRewards: end block in the past");
 
@@ -221,7 +225,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 
         pool.rewardToken.transferFrom(msg.sender, address(rewardGuildBank), _rewardAmount);
 
-        // todo emit event
+        emit RewardsSetUp(_pid, _rewardAmount, _rewardEndBlock);
     }
 
     function pendingRewards(uint256 _pid, address _user) external view returns (uint256) {
@@ -259,15 +263,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         require(_pid < poolInfo.length, "updatePool: invalid _pid");
 
         PoolInfo storage pool = poolInfo[_pid];
-        if (pool.rewardEndBlock == 0) { // client has not sent rewards
+        if (pool.rewardEndBlock == 0) { // project has not sent rewards
             return;
         }
-
-        //        uint256 erc20Supply = pool.erc20Token.balanceOf(address(this));
-        //        if (erc20Supply == 0) {
-        //            pool.lastRewardBlock = block.number;
-        //            return;
-        //        }
 
         uint256 maxEndBlock = block.number <= pool.rewardEndBlock ? block.number : pool.rewardEndBlock;
         uint256 multiplier = getMultiplier(pool.lastRewardBlock, maxEndBlock);
@@ -283,7 +281,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         pool.lastRewardBlock = maxEndBlock;
     }
 
-    function claimReward(uint256 _pid) public { //todo non reentrant
+    function claimReward(uint256 _pid) public nonReentrant {
         updatePool(_pid);
 
         UserInfo storage user = userInfo[_pid][msg.sender];
@@ -296,12 +294,12 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
             safeRewardTransfer(pool.rewardToken, msg.sender, pending);
         }
 
-        // todo emit event
+        emit RewardClaimed(msg.sender, _pid, pending);
     }
 
     // withdraw only permitted post `pledgeFundingEndBlock` and you can only take out full amount regardless of whether you have funded your pledge
     // functions like the old emergency withdraw as it does not concern itself with claiming rewards
-    function withdraw(uint256 _pid) external {
+    function withdraw(uint256 _pid) external nonReentrant {
         require(_pid < poolInfo.length, "withdraw: invalid _pid");
 
         PoolInfo storage pool = poolInfo[_pid];
@@ -314,11 +312,10 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 
         stakingToken.safeTransfer(address(msg.sender), user.amount);
 
-        // todo event
-        //emit Withdraw(msg.sender, _pid, _amount);
+        emit Withdraw(msg.sender, _pid, user.amount);
     }
 
-    function claimFundRaising(uint256 _pid) external { // todo non reentrant
+    function claimFundRaising(uint256 _pid) external nonReentrant {
         require(_pid < poolInfo.length, "claimFundRaising: invalid _pid");
         PoolInfo storage pool = poolInfo[_pid];
 
@@ -328,7 +325,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         pool.fundsClaimed = true;
         pool.fundRaisingRecipient.call{value: pool.totalRaised}("");
 
-        // todo event
+        emit FundRaisingClaimed(_pid, pool.fundRaisingRecipient, pool.totalRaised);
     }
 
     ////////////
