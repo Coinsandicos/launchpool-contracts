@@ -179,6 +179,30 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
           _1BlockPastFundingEndBlock.add(toBn('100')), // 1k tokens a block
           project1Admin
         )
+
+        // rewards will come through after a few blocks
+        const poolInfoAfterSettingUpRewards = await this.fundRaising.poolInfo(POOL_ZERO);
+        await time.advanceBlockTo(poolInfoAfterSettingUpRewards.lastRewardBlock.addn(4));
+
+        // 5 blocks of rewards should be available
+        await this.fundRaising.claimReward(POOL_ZERO, {from: alice})
+
+        const totalRewardsForAliceAndBobAfter5Blocks = poolInfoAfterSettingUpRewards.rewardPerBlock.muln(5)
+        const totalRewardsAlice = totalRewardsForAliceAndBobAfter5Blocks.muln(2).divn(3) // alice gets 2/3
+
+        const aliceRewardTokenBalAfterClaim = await this.rewardToken1.balanceOf(alice)
+
+        shouldBeNumberInEtherCloseTo(aliceRewardTokenBalAfterClaim, fromWei(totalRewardsAlice))
+
+        // bob claims after 6 blocks
+        const totalRewardsForAliceAndBobAfter6Blocks = poolInfoAfterSettingUpRewards.rewardPerBlock.muln(6)
+        const totalRewardsBob = totalRewardsForAliceAndBobAfter6Blocks.divn(3) // bob gets 1/3
+
+        await this.fundRaising.claimReward(POOL_ZERO, {from: bob})
+
+        const bobRewardTokenBalAfterClaim = await this.rewardToken1.balanceOf(bob)
+
+        shouldBeNumberInEtherCloseTo(bobRewardTokenBalAfterClaim, fromWei(totalRewardsBob))
       })
 
       describe('When another pool is set up', () => {
