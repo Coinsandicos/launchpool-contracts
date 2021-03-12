@@ -1,4 +1,4 @@
-const {time, BN, expectRevert, constants, ether} = require('@openzeppelin/test-helpers');
+const {time, BN, expectRevert, constants, ether, balance} = require('@openzeppelin/test-helpers');
 
 const LaunchPoolToken = artifacts.require('LaunchPoolToken');
 const LaunchPoolFundRaisingWithVesting = artifacts.require('LaunchPoolFundRaisingWithVesting');
@@ -40,6 +40,21 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
     expect(poolInfoAfter.totalStaked.sub(poolInfoBefore.totalStaked)).to.be.bignumber.equal(amount)
   }
 
+  const fundPledge = async (poolId, sender) => {
+    const poolInfoBefore = await this.fundRaising.poolInfo(poolId)
+    const contractEthBalance = await balance.tracker(this.fundRaising.address)
+
+    const pledgeFundingAmount = await this.fundRaising.getPledgeFundingAmount(poolId, {from: sender})
+    await this.fundRaising.fundPledge(poolId, {from: sender, value: pledgeFundingAmount})
+
+    const poolInfoAfter = await this.fundRaising.poolInfo(poolId)
+    expect(poolInfoAfter.totalRaised.sub(poolInfoBefore.totalRaised)).to.be.bignumber.equal(pledgeFundingAmount)
+    expect(await contractEthBalance.delta()).to.be.bignumber.equal(pledgeFundingAmount)
+
+    const {pledgeFundingAmount: fundingCommited} = await this.fundRaising.userInfo(poolId, sender)
+    expect(fundingCommited).to.be.bignumber.equal(pledgeFundingAmount)
+  }
+
   const POOL_ZERO = new BN('0');
   const POOL_ONE = new BN('1');
 
@@ -67,9 +82,9 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
           {from: project1Admin}
         )
 
-        this.stakingEndBlock = '100'
-        this.pledgeFundingEndBlock = '150'
-        this.project1TargetRaise = ether('1000')
+        this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+        this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+        this.project1TargetRaise = ether('100')
 
         await this.fundRaising.add(
           this.rewardToken1.address,
@@ -83,7 +98,16 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
       })
 
       it('Can farm reward tokens once all stages have passed', async () => {
-        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice)
+        // let alice and bob pledge funding by staking LPOOL
+        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice) // Alice will have to fund 2/3 of the target raise
+        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS.divn(2), bob) // Bob will have to fund 1/3
+
+        // move past staking end
+        await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')));
+
+        // fund the pledge
+        await fundPledge(POOL_ZERO, alice)
+        await fundPledge(POOL_ZERO, bob)
       })
 
       describe('When another pool is set up', () => {
