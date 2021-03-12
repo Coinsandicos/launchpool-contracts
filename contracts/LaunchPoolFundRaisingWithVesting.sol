@@ -131,7 +131,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         emit PoolAdded(poolInfo.length.sub(1));
     }
 
-    // todo define what can be updated
+    // todo define what can be updated - fund raising recipient for example
 //    /// @notice Update a pool's allocation point to increase or decrease its share of contract-level rewards
 //    /// @notice Can also update the max amount that can be staked per user
 //    /// @dev Can only be called by the owner
@@ -215,6 +215,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         PoolInfo storage pool = poolInfo[_pid];
 
         require(block.number > pool.pledgeFundingEndBlock, "setupVestingRewards: Stakers are still pledging");
+        require(msg.sender == pool.fundRaisingRecipient, "setupVestingRewards: Only fund raising recipient");
 
         uint256 currentBlockNumber = block.number;
         uint256 vestingLength = _rewardEndBlock.sub(currentBlockNumber);

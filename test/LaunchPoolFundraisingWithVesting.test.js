@@ -72,6 +72,29 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
     expect(await contractEthBalance.delta()).to.be.bignumber.equal(pledgeFundingAmount)
   }
 
+  const setupVestingRewards = async (poolId, rewardToken, rewardAmount, rewardEndBlock, sender) => {
+    await rewardToken.approve(this.fundRaising.address, rewardAmount, {from: sender})
+
+    const guildTokenBalBefore = await rewardToken.balanceOf(this.guildBankAddress)
+
+    const {receipt} = await this.fundRaising.setupVestingRewards(
+      poolId,
+      rewardAmount,
+      rewardEndBlock,
+      {from: sender}
+    )
+
+    await expectEvent(receipt, 'RewardsSetUp', {
+      pid: poolId,
+      amount: rewardAmount,
+      rewardEndBlock
+    })
+
+    const guildTokenBalAfter = await rewardToken.balanceOf(this.guildBankAddress)
+
+    expect(guildTokenBalAfter.sub(guildTokenBalBefore)).to.be.bignumber.equal(rewardAmount)
+  }
+
   const POOL_ZERO = new BN('0');
   const POOL_ONE = new BN('1');
 
@@ -82,6 +105,8 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
       this.launchPoolToken.address,
       {from: deployer}
     )
+
+    this.guildBankAddress = await this.fundRaising.rewardGuildBank();
 
     await setupUsers(deployer);
 
@@ -120,20 +145,28 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
         await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS.divn(2), bob) // Bob will have to fund 1/3
 
         // move past staking end
-        await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')));
+        await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
 
         // fund the pledge
         await fundPledge(POOL_ZERO, alice)
         await fundPledge(POOL_ZERO, bob)
 
         // move past funding period
-        await time.advanceBlockTo(this.pledgeFundingEndBlock.add(toBn('1')));
+        const _1BlockPastFundingEndBlock = this.pledgeFundingEndBlock.add(toBn('1'))
+        await time.advanceBlockTo(_1BlockPastFundingEndBlock);
 
         // 100% funding will have taken place
         const {raised, target} = await this.fundRaising.getTotalRaisedVsTarget(POOL_ZERO)
         shouldBeNumberInEtherCloseTo(raised, fromWei(target))
 
-
+        // Project admin sends the rewards tokens in relation to raise
+        await setupVestingRewards(
+          POOL_ZERO,
+          this.rewardToken1,
+          ONE_HUNDRED_THOUSAND_TOKENS,
+          _1BlockPastFundingEndBlock.add(toBn('100')), // 1k tokens a block
+          project1Admin
+        )
       })
 
       describe('When another pool is set up', () => {
