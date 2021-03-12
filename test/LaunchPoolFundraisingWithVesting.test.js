@@ -93,6 +93,18 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
     const guildTokenBalAfter = await rewardToken.balanceOf(this.guildBankAddress)
 
     expect(guildTokenBalAfter.sub(guildTokenBalBefore)).to.be.bignumber.equal(rewardAmount)
+
+    const {
+      maxRewardTokenAvailableForVesting,
+      rewardPerBlock,
+      lastRewardBlock,
+      rewardEndBlock: rewardEndBlockFromPoolInfo
+    } = await this.fundRaising.poolInfo(poolId)
+
+    expect(maxRewardTokenAvailableForVesting).to.be.bignumber.equal(rewardAmount)
+    expect(lastRewardBlock).to.be.bignumber.equal(this.pledgeFundingEndBlock.add(toBn(3)))
+    expect(rewardEndBlockFromPoolInfo).to.be.bignumber.equal(rewardEndBlock)
+    expect(rewardPerBlock).to.be.bignumber.equal(maxRewardTokenAvailableForVesting.div(rewardEndBlock.sub(this.pledgeFundingEndBlock.add(toBn(3)))))
   }
 
   const POOL_ZERO = new BN('0');
