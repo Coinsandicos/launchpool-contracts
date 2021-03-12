@@ -78,6 +78,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     constructor(IERC20 _stakingToken) public {
         require(address(_stakingToken) != address(0), "constructor: _stakingToken must not be zero address");
 
+        stakingToken = _stakingToken;
         rewardGuildBank = new FundRaisingGuild(address(this));
 
         emit ContractDeployed();

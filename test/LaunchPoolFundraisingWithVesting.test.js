@@ -21,16 +21,16 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
   const ONE_MILLION_TOKENS = to18DP('1000000');
   const TEN_MILLION_TOKENS = ONE_MILLION_TOKENS.muln(10);
 
-  const setupUsers = async (token, from) => {
-    await token.transfer(alice, ONE_THOUSAND_TOKENS, {from});
-    await token.transfer(bob, ONE_THOUSAND_TOKENS, {from});
-    await token.transfer(carol, ONE_THOUSAND_TOKENS, {from});
+  const setupUsers = async (from) => {
+    await this.launchPoolToken.transfer(alice, ONE_THOUSAND_TOKENS, {from});
+    await this.launchPoolToken.transfer(bob, ONE_THOUSAND_TOKENS, {from});
+    await this.launchPoolToken.transfer(carol, ONE_THOUSAND_TOKENS, {from});
   };
 
   const pledge = async (poolId, amount, sender) => {
     const poolInfoBefore = await this.fundRaising.poolInfo(poolId)
 
-    await this.launchPoolToken.approve(this.fundRaising, amount, {from: sender})
+    await this.launchPoolToken.approve(this.fundRaising.address, amount, {from: sender})
     await this.fundRaising.pledge(poolId, amount, {from: sender})
 
     const {amount: pledgedAmount} = await this.fundRaising.userInfo(poolId, sender)
@@ -47,15 +47,16 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
     this.launchPoolToken = await LaunchPoolToken.new(TEN_MILLION_TOKENS, deployer, {from: deployer});
 
     this.fundRaising = await LaunchPoolFundRaisingWithVesting.new(
-      this.launchPoolToken.address
+      this.launchPoolToken.address,
+      {from: deployer}
     )
 
-    await setupUsers(this.launchPoolToken, deployer);
+    await setupUsers(deployer);
 
     this.currentBlock = await time.latestBlock();
   })
 
-  describe.skip('Fund raising end to end flow', () => {
+  describe.only('Fund raising end to end flow', () => {
     describe('With 1 pool set up', () => {
       beforeEach(async () => {
         // create reward token for fund raising
@@ -66,8 +67,8 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
           {from: project1Admin}
         )
 
-        this.stakingEndBlock = this.currentBlock.add(toBn('100'))
-        this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+        this.stakingEndBlock = '100'
+        this.pledgeFundingEndBlock = '150'
         this.project1TargetRaise = ether('1000')
 
         await this.fundRaising.add(
