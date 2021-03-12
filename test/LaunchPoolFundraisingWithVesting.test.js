@@ -1,4 +1,4 @@
-const {time, BN, expectRevert, constants, ether, balance} = require('@openzeppelin/test-helpers');
+const {time, BN, expectRevert, expectEvent, constants, ether, balance} = require('@openzeppelin/test-helpers');
 
 const LaunchPoolToken = artifacts.require('LaunchPoolToken');
 const LaunchPoolFundRaisingWithVesting = artifacts.require('LaunchPoolFundRaisingWithVesting');
@@ -31,7 +31,13 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
     const poolInfoBefore = await this.fundRaising.poolInfo(poolId)
 
     await this.launchPoolToken.approve(this.fundRaising.address, amount, {from: sender})
-    await this.fundRaising.pledge(poolId, amount, {from: sender})
+    const {receipt} = await this.fundRaising.pledge(poolId, amount, {from: sender})
+
+    await expectEvent(receipt, 'Pledge', {
+      user: sender,
+      pid: poolId,
+      amount
+    })
 
     const {amount: pledgedAmount} = await this.fundRaising.userInfo(poolId, sender)
     expect(pledgedAmount).to.be.bignumber.equal(amount)
@@ -45,14 +51,21 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
     const contractEthBalance = await balance.tracker(this.fundRaising.address)
 
     const pledgeFundingAmount = await this.fundRaising.getPledgeFundingAmount(poolId, {from: sender})
-    await this.fundRaising.fundPledge(poolId, {from: sender, value: pledgeFundingAmount})
+    const {receipt} = await this.fundRaising.fundPledge(poolId, {from: sender, value: pledgeFundingAmount})
+
+    await expectEvent(receipt, 'PledgeFunded', {
+      user: sender,
+      pid: poolId,
+      amount: pledgeFundingAmount
+    })
+
+    const {pledgeFundingAmount: fundingCommited, amount} = await this.fundRaising.userInfo(poolId, sender)
+    expect(fundingCommited).to.be.bignumber.equal(pledgeFundingAmount)
 
     const poolInfoAfter = await this.fundRaising.poolInfo(poolId)
     expect(poolInfoAfter.totalRaised.sub(poolInfoBefore.totalRaised)).to.be.bignumber.equal(pledgeFundingAmount)
+    expect(poolInfoAfter.totalStakeThatHasFundedPledge.sub(poolInfoBefore.totalStakeThatHasFundedPledge)).to.be.bignumber.equal(amount)
     expect(await contractEthBalance.delta()).to.be.bignumber.equal(pledgeFundingAmount)
-
-    const {pledgeFundingAmount: fundingCommited} = await this.fundRaising.userInfo(poolId, sender)
-    expect(fundingCommited).to.be.bignumber.equal(pledgeFundingAmount)
   }
 
   const POOL_ZERO = new BN('0');
@@ -108,6 +121,9 @@ contract('LaunchPoolFundRaisingWithVesting', ([deployer, alice, bob, carol, proj
         // fund the pledge
         await fundPledge(POOL_ZERO, alice)
         await fundPledge(POOL_ZERO, bob)
+
+        // move past funding period
+        await time.advanceBlockTo(this.pledgeFundingEndBlock.add(toBn('1')));
       })
 
       describe('When another pool is set up', () => {
