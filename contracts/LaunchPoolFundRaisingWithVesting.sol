@@ -21,8 +21,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
     /// @dev Details about each user in a pool
     struct UserInfo {
         uint256 amount;     // How many tokens are staked in a pool
-        uint256 rewardDebt; // Reward debt. See explanation below.
+        uint256 pledgeFundingAmount;
         bool stakeWithdrawn; // Set to true if the staked amount is withdrawn after the deposit deadline. No more withdrawals permitted!!
+        uint256 rewardDebt; // Reward debt. See explanation below.
         //
         // We do some fancy math here. Basically, once vesting has started in a pool (if they have deposited), the amount of reward tokens
         // entitled to a user but is pending to be distributed is:
@@ -37,13 +38,14 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         IERC20 rewardToken; // Address of the reward token contract.
         uint256 rewardPerBlock; // Number of reward tokens distributed per block for this pool
         uint256 stakingEndBlock;
-        uint256 depositEndBlock;
+        uint256 pledgeFundingEndBlock;
         uint256 lastRewardBlock; // Last block number that reward token distribution or vesting start block up to end block
         uint256 rewardEndBlock;
         uint256 accRewardPerShare; // Per LP token staked, how much reward token earned in pool that users will get
         uint256 maxRewardTokenAvailableForVesting;
         uint256 targetRaise;
         uint256 totalStaked;
+        uint256 totalRaised;
     }
 
     /// @notice staking token is fixed for all pools
@@ -90,7 +92,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 
     /// @notice Create a new reward pool by whitelisting a new ERC20 token.
     /// @dev Can only be called by the contract owner
-    function add(IERC20 _rewardToken, uint256 _stakingEndBlock, uint256 _depositEndBlock, uint256 _targetRaise, bool _withUpdate) public onlyOwner {
+    function add(IERC20 _rewardToken, uint256 _stakingEndBlock, uint256 _pledgeFundingEndBlock, uint256 _targetRaise, bool _withUpdate) public onlyOwner {
         address rewardTokenAddress = address(_rewardToken);
         require(rewardTokenAddress != address(0), "add: _rewardToken must not be zero address");
 
@@ -104,13 +106,14 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
             rewardToken : _rewardToken,
             rewardPerBlock: 0,
             stakingEndBlock: _stakingEndBlock,
-            depositEndBlock: _depositEndBlock,
+            pledgeFundingEndBlock: _pledgeFundingEndBlock,
             lastRewardBlock: 0,
             rewardEndBlock: 0,
             accRewardPerShare: 0,
             maxRewardTokenAvailableForVesting: 0,
             targetRaise: _targetRaise,
-            totalStaked: 0
+            totalStaked: 0,
+            totalRaised: 0
         }));
     }
 
@@ -136,10 +139,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 //        poolInfo[_pid].maxStakingAmountPerUser = _maxStakingAmountPerUser;
 //    }
 
-    /// @notice View function to see pending and unclaimed reward tokens for a given user
-    /// @param _pid ID of the pool where a user has a stake
-    /// @param _user Account being queried
-    /// @return Amount of reward tokens due to a user
+
     function pendingRewards(uint256 _pid, address _user) external view returns (uint256) {
         require(_pid < poolInfo.length, "pendingRewards: invalid _pid");
 
@@ -158,7 +158,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         return user.amount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebt);
     }
 
-    /// @notice Cycles through the pools to update all of the rewards accrued
+
     function massUpdatePools() public {
         uint256 length = poolInfo.length;
         for (uint256 pid = 0; pid < length; pid++) {
@@ -166,13 +166,16 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         }
     }
 
-    /// @notice Updates a specific pool to track all of the rewards accrued up to the TX block
-    /// @param _pid ID of the pool
+
     function updatePool(uint256 _pid) public {
         require(_pid < poolInfo.length, "updatePool: invalid _pid");
 
         PoolInfo storage pool = poolInfo[_pid];
         if (pool.rewardEndBlock == 0) { // client has not sent rewards
+            return;
+        }
+
+        if (block.number < pool.lastRewardBlock) { // client has sent rewards but rewards distribution not started
             return;
         }
 
@@ -196,58 +199,82 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         pool.lastRewardBlock = maxEndBlock;
     }
 
-    /// @notice Where any user can stake their ERC20 tokens into a pool in order to farm rewards
-    /// @param _pid ID of the pool
-    /// @param _amount Amount of ERC20 being staked
-    function deposit(uint256 _pid, uint256 _amount) external { //non reentrant?
+    // stage 1
+    function pledge(uint256 _pid, uint256 _amount) external { //non reentrant?
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
 
-        updatePool(_pid);
+        require(_amount > 0, "pledge: No pledge specified");
+        require(block.number <= pool.stakingEndBlock, "pledge: Staking no longer permitted");
 
-        if (user.amount > 0) {
-            uint256 pending = user.amount.mul(pool.accRewardPerShare).div(1e18).sub(user.rewardDebt);
-            if (pending > 0) {
-                safeRewardTransfer(pool.rewardToken, msg.sender, pending);
-            }
-        }
+        //updatePool(_pid);
 
-        if (_amount > 0) {
-            user.amount = user.amount.add(_amount);
-            pool.totalStaked = pool.totalStaked.add(_amount);
-            stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
-        }
+//        if (user.amount > 0) {
+//            uint256 pending = user.amount.mul(pool.accRewardPerShare).div(1e18).sub(user.rewardDebt);
+//            if (pending > 0) {
+//                safeRewardTransfer(pool.rewardToken, msg.sender, pending);
+//            }
+//        }
 
-        user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
+        user.amount = user.amount.add(_amount);
+        pool.totalStaked = pool.totalStaked.add(_amount);
+
+        //user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
+
+        stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+
+        // todo emit pledge
         //emit Deposit(msg.sender, _pid, _amount);
     }
 
-    /// @notice Allows a user to withdraw any ERC20 tokens staked in a pool
-    /// @dev Partial withdrawals permitted
-    /// @param _pid Pool ID
-    /// @param _amount Being withdrawn
-    function withdraw(uint256 _pid, uint256 _amount) external {
+    // pre-stage 2 for staker
+    function getPledgeFundingAmount(uint256 _pid) public view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
 
-        require(user.amount >= _amount, "withdraw: _amount not good");
+        uint256 targetRaiseForPool = pool.targetRaise.mul(1e18);
+        uint256 raisePerShare = targetRaiseForPool.div(pool.totalStaked);
 
-        updatePool(_pid);
-
-        uint256 pending = user.amount.mul(pool.accRewardPerShare).div(1e18).sub(user.rewardDebt);
-        if (pending > 0) {
-            safeRewardTransfer(pool.rewardToken, msg.sender, pending);
-        }
-
-        if (_amount > 0) {
-            user.amount = user.amount.sub(_amount);
-            pool.totalStaked = pool.totalStaked.sub(_amount);
-            stakingToken.safeTransfer(address(msg.sender), _amount);
-        }
-
-        user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
-        //emit Withdraw(msg.sender, _pid, _amount);
+        return user.amount.mul(raisePerShare).div(1e18);
     }
+
+    function fundPledge(uint256 _pid) external payable {
+        PoolInfo storage pool = poolInfo[_pid];
+        UserInfo storage user = userInfo[_pid][msg.sender];
+
+        require(user.pledgeFundingAmount == 0, "fundPledge: Pledge has already been funded");
+        require(block.number <= pool.pledgeFundingEndBlock, "fundPledge: Deadline has passed to fund your pledge");
+        require(msg.value == getPledgeFundingAmount(_pid), "fundPledge: Required ETH amount not satisfied");
+
+        pool.totalRaised = pool.totalRaised.add(msg.value);
+        user.pledgeFundingAmount = user.pledgeFundingAmount.add(msg.value);
+
+        // todo event
+    }
+
+
+//    function withdraw(uint256 _pid, uint256 _amount) external {
+//        PoolInfo storage pool = poolInfo[_pid];
+//        UserInfo storage user = userInfo[_pid][msg.sender];
+//
+//        require(user.amount >= _amount, "withdraw: _amount not good");
+//
+//        updatePool(_pid);
+//
+//        uint256 pending = user.amount.mul(pool.accRewardPerShare).div(1e18).sub(user.rewardDebt);
+//        if (pending > 0) {
+//            safeRewardTransfer(pool.rewardToken, msg.sender, pending);
+//        }
+//
+//        if (_amount > 0) {
+//            user.amount = user.amount.sub(_amount);
+//            pool.totalStaked = pool.totalStaked.sub(_amount);
+//            stakingToken.safeTransfer(address(msg.sender), _amount);
+//        }
+//
+//        user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
+//        //emit Withdraw(msg.sender, _pid, _amount);
+//    }
 
 //    /// @notice Emergency only. Should the rewards issuance mechanism fail, people can still withdraw their stake
 //    /// @param _pid Pool ID
