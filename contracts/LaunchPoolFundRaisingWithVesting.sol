@@ -46,6 +46,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         uint256 targetRaise;
         uint256 totalStaked;
         uint256 totalRaised;
+        uint256 totalStakeThatHasFundedPledge;
     }
 
     /// @notice staking token is fixed for all pools
@@ -113,7 +114,8 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
             maxRewardTokenAvailableForVesting: 0,
             targetRaise: _targetRaise,
             totalStaked: 0,
-            totalRaised: 0
+            totalRaised: 0,
+            totalStakeThatHasFundedPledge: 0
         }));
     }
 
@@ -139,68 +141,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 //        poolInfo[_pid].maxStakingAmountPerUser = _maxStakingAmountPerUser;
 //    }
 
-
-    function pendingRewards(uint256 _pid, address _user) external view returns (uint256) {
-        require(_pid < poolInfo.length, "pendingRewards: invalid _pid");
-
-        PoolInfo storage pool = poolInfo[_pid];
-        UserInfo storage user = userInfo[_pid][_user];
-
-        uint256 accRewardPerShare = pool.accRewardPerShare;
-
-        if (block.number > pool.lastRewardBlock && pool.rewardEndBlock != 0 && pool.totalStaked != 0) {
-            uint256 maxEndBlock = block.number <= pool.rewardEndBlock ? block.number : pool.rewardEndBlock;
-            uint256 multiplier = getMultiplier(pool.lastRewardBlock, maxEndBlock);
-            uint256 reward = multiplier.mul(pool.rewardPerBlock);
-            accRewardPerShare = accRewardPerShare.add(reward.mul(1e18).div(pool.totalStaked));
-        }
-
-        return user.amount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebt);
-    }
-
-
-    function massUpdatePools() public {
-        uint256 length = poolInfo.length;
-        for (uint256 pid = 0; pid < length; pid++) {
-            updatePool(pid);
-        }
-    }
-
-
-    function updatePool(uint256 _pid) public {
-        require(_pid < poolInfo.length, "updatePool: invalid _pid");
-
-        PoolInfo storage pool = poolInfo[_pid];
-        if (pool.rewardEndBlock == 0) { // client has not sent rewards
-            return;
-        }
-
-        if (block.number < pool.lastRewardBlock) { // client has sent rewards but rewards distribution not started
-            return;
-        }
-
-//        uint256 erc20Supply = pool.erc20Token.balanceOf(address(this));
-//        if (erc20Supply == 0) {
-//            pool.lastRewardBlock = block.number;
-//            return;
-//        }
-
-        uint256 maxEndBlock = block.number <= pool.rewardEndBlock ? block.number : pool.rewardEndBlock;
-        uint256 multiplier = getMultiplier(pool.lastRewardBlock, maxEndBlock);
-
-        // No point in doing any more logic as the rewards have ended
-        if (multiplier == 0) {
-            return;
-        }
-
-        uint256 reward = multiplier.mul(pool.rewardPerBlock);
-
-        pool.accRewardPerShare = pool.accRewardPerShare.add(reward.mul(1e18).div(pool.totalStaked));
-        pool.lastRewardBlock = maxEndBlock;
-    }
-
-    // stage 1
+    // step 1
     function pledge(uint256 _pid, uint256 _amount) external { //non reentrant?
+        require(_pid < poolInfo.length, "Invalid PID");
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
 
@@ -227,8 +170,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         //emit Deposit(msg.sender, _pid, _amount);
     }
 
-    // pre-stage 2 for staker
+    // pre-step 2 for staker
     function getPledgeFundingAmount(uint256 _pid) public view returns (uint256) {
+        require(_pid < poolInfo.length, "Invalid PID");
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
 
@@ -238,7 +182,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         return user.amount.mul(raisePerShare).div(1e18);
     }
 
+    // step 2
     function fundPledge(uint256 _pid) external payable {
+        require(_pid < poolInfo.length, "Invalid PID");
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
 
@@ -249,7 +195,90 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         pool.totalRaised = pool.totalRaised.add(msg.value);
         user.pledgeFundingAmount = user.pledgeFundingAmount.add(msg.value);
 
+        pool.totalStakeThatHasFundedPledge = pool.totalStakeThatHasFundedPledge.add(user.amount);
+
         // todo event
+    }
+
+    // pre-step 3 for client
+    function getTotalRaised(uint256 _pid) external view returns (uint256) {
+        return poolInfo[_pid].totalRaised;
+    }
+
+    function setupVestingRewards(uint256 _pid, uint256 _rewardAmount, uint256 _rewardEndBlock) external { //todo nonreentrant
+        require(_pid < poolInfo.length, "Invalid PID");
+        require(_rewardEndBlock > block.number, "setupVestingRewards: end block in the past");
+
+        PoolInfo storage pool = poolInfo[_pid];
+
+        require(block.number > pool.pledgeFundingEndBlock, "setupVestingRewards: Stakers are still pledging");
+
+        uint256 currentBlockNumber = block.number;
+        uint256 vestingLength = _rewardEndBlock.sub(currentBlockNumber);
+
+        pool.maxRewardTokenAvailableForVesting = _rewardAmount;
+        pool.rewardPerBlock = _rewardAmount.div(vestingLength);
+        pool.lastRewardBlock = currentBlockNumber;
+        pool.rewardEndBlock = _rewardEndBlock;
+    }
+
+    function pendingRewards(uint256 _pid, address _user) external view returns (uint256) {
+        require(_pid < poolInfo.length, "pendingRewards: invalid _pid");
+
+        PoolInfo storage pool = poolInfo[_pid];
+        UserInfo storage user = userInfo[_pid][_user];
+
+        // If they have staked but have not funded their pledge, they are not entitled to rewards
+        if (user.pledgeFundingAmount == 0) {
+            return 0;
+        }
+
+        uint256 accRewardPerShare = pool.accRewardPerShare;
+
+        if (block.number > pool.lastRewardBlock && pool.rewardEndBlock != 0 && pool.totalStaked != 0) {
+            uint256 maxEndBlock = block.number <= pool.rewardEndBlock ? block.number : pool.rewardEndBlock;
+            uint256 multiplier = getMultiplier(pool.lastRewardBlock, maxEndBlock);
+            uint256 reward = multiplier.mul(pool.rewardPerBlock);
+            accRewardPerShare = accRewardPerShare.add(reward.mul(1e18).div(pool.totalStakeThatHasFundedPledge));
+        }
+
+        return user.amount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebt);
+    }
+
+
+    function massUpdatePools() public {
+        for (uint256 pid = 0; pid < poolInfo.length; pid++) {
+            updatePool(pid);
+        }
+    }
+
+
+    function updatePool(uint256 _pid) public {
+        require(_pid < poolInfo.length, "updatePool: invalid _pid");
+
+        PoolInfo storage pool = poolInfo[_pid];
+        if (pool.rewardEndBlock == 0) { // client has not sent rewards
+            return;
+        }
+
+        //        uint256 erc20Supply = pool.erc20Token.balanceOf(address(this));
+        //        if (erc20Supply == 0) {
+        //            pool.lastRewardBlock = block.number;
+        //            return;
+        //        }
+
+        uint256 maxEndBlock = block.number <= pool.rewardEndBlock ? block.number : pool.rewardEndBlock;
+        uint256 multiplier = getMultiplier(pool.lastRewardBlock, maxEndBlock);
+
+        // No point in doing any more logic as the rewards have ended
+        if (multiplier == 0) {
+            return;
+        }
+
+        uint256 reward = multiplier.mul(pool.rewardPerBlock);
+
+        pool.accRewardPerShare = pool.accRewardPerShare.add(reward.mul(1e18).div(pool.totalStakeThatHasFundedPledge));
+        pool.lastRewardBlock = maxEndBlock;
     }
 
 
