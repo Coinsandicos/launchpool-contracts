@@ -47,6 +47,8 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         uint256 totalStaked;
         uint256 totalRaised;
         uint256 totalStakeThatHasFundedPledge;
+        address payable fundRaisingRecipient;
+        bool fundsClaimed;
     }
 
     /// @notice staking token is fixed for all pools
@@ -73,13 +75,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
     constructor(IERC20 _stakingToken) public {
         require(address(_stakingToken) != address(0), "constructor: _stakingToken must not be zero address");
 
-//        maxRewardTokenAvailableForFarming = _maxRewardTokenAvailableForFarming;
-//        startBlock = _startBlock;
-//        endBlock = _endBlock;
-//
-//        uint256 numberOfBlocksForFarming = endBlock.sub(startBlock);
-//        rewardPerBlock = maxRewardTokenAvailableForFarming.div(numberOfBlocksForFarming);
-
         rewardGuildBank = new FundRaisingGuild(address(this));
 
         //todo deploy event
@@ -93,15 +88,24 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 
     /// @notice Create a new reward pool by whitelisting a new ERC20 token.
     /// @dev Can only be called by the contract owner
-    function add(IERC20 _rewardToken, uint256 _stakingEndBlock, uint256 _pledgeFundingEndBlock, uint256 _targetRaise, bool _withUpdate) public onlyOwner {
+    function add(
+        IERC20 _rewardToken,
+        uint256 _stakingEndBlock,
+        uint256 _pledgeFundingEndBlock,
+        uint256 _targetRaise,
+        address payable _fundRaisingRecipient,
+        bool _withUpdate
+    ) public onlyOwner {
         address rewardTokenAddress = address(_rewardToken);
-        require(rewardTokenAddress != address(0), "add: _rewardToken must not be zero address");
+        require(rewardTokenAddress != address(0), "add: _rewardToken is zero address");
+        require(_stakingEndBlock < _pledgeFundingEndBlock, "add: staking end must be before funding end");
+        require(_targetRaise > 0, "add: Invalid raise amount");
+        require(_fundRaisingRecipient != address(0), "add: _fundRaisingRecipient is zero address");
 
+        // todo: does mass update make sense here?
         if (_withUpdate) {
             massUpdatePools();
         }
-
-        //uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
 
         poolInfo.push(PoolInfo({
             rewardToken : _rewardToken,
@@ -115,10 +119,13 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
             targetRaise: _targetRaise,
             totalStaked: 0,
             totalRaised: 0,
-            totalStakeThatHasFundedPledge: 0
+            totalStakeThatHasFundedPledge: 0,
+            fundRaisingRecipient: _fundRaisingRecipient,
+            fundsClaimed: false
         }));
     }
 
+    // todo define what can be updated
 //    /// @notice Update a pool's allocation point to increase or decrease its share of contract-level rewards
 //    /// @notice Can also update the max amount that can be staked per user
 //    /// @dev Can only be called by the owner
@@ -143,26 +150,15 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 
     // step 1
     function pledge(uint256 _pid, uint256 _amount) external { //non reentrant?
-        require(_pid < poolInfo.length, "Invalid PID");
+        require(_pid < poolInfo.length, "pledge: Invalid PID");
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
 
         require(_amount > 0, "pledge: No pledge specified");
         require(block.number <= pool.stakingEndBlock, "pledge: Staking no longer permitted");
 
-        //updatePool(_pid);
-
-//        if (user.amount > 0) {
-//            uint256 pending = user.amount.mul(pool.accRewardPerShare).div(1e18).sub(user.rewardDebt);
-//            if (pending > 0) {
-//                safeRewardTransfer(pool.rewardToken, msg.sender, pending);
-//            }
-//        }
-
         user.amount = user.amount.add(_amount);
         pool.totalStaked = pool.totalStaked.add(_amount);
-
-        //user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
 
         stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
 
@@ -172,7 +168,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 
     // pre-step 2 for staker
     function getPledgeFundingAmount(uint256 _pid) public view returns (uint256) {
-        require(_pid < poolInfo.length, "Invalid PID");
+        require(_pid < poolInfo.length, "getPledgeFundingAmount: Invalid PID");
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
 
@@ -184,16 +180,17 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
 
     // step 2
     function fundPledge(uint256 _pid) external payable {
-        require(_pid < poolInfo.length, "Invalid PID");
+        require(_pid < poolInfo.length, "fundPledge: Invalid PID");
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
 
         require(user.pledgeFundingAmount == 0, "fundPledge: Pledge has already been funded");
+        require(block.number > pool.stakingEndBlock, "fundPledge: Staking is still taking place");
         require(block.number <= pool.pledgeFundingEndBlock, "fundPledge: Deadline has passed to fund your pledge");
         require(msg.value == getPledgeFundingAmount(_pid), "fundPledge: Required ETH amount not satisfied");
 
         pool.totalRaised = pool.totalRaised.add(msg.value);
-        user.pledgeFundingAmount = user.pledgeFundingAmount.add(msg.value);
+        user.pledgeFundingAmount = msg.value;
 
         pool.totalStakeThatHasFundedPledge = pool.totalStakeThatHasFundedPledge.add(user.amount);
 
@@ -205,8 +202,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         return poolInfo[_pid].totalRaised;
     }
 
+    // step 3
     function setupVestingRewards(uint256 _pid, uint256 _rewardAmount, uint256 _rewardEndBlock) external { //todo nonreentrant
-        require(_pid < poolInfo.length, "Invalid PID");
+        require(_pid < poolInfo.length, "setupVestingRewards: Invalid PID");
         require(_rewardEndBlock > block.number, "setupVestingRewards: end block in the past");
 
         PoolInfo storage pool = poolInfo[_pid];
@@ -220,6 +218,10 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         pool.rewardPerBlock = _rewardAmount.div(vestingLength);
         pool.lastRewardBlock = currentBlockNumber;
         pool.rewardEndBlock = _rewardEndBlock;
+
+        pool.rewardToken.transferFrom(msg.sender, address(rewardGuildBank), _rewardAmount);
+
+        // todo emit event
     }
 
     function pendingRewards(uint256 _pid, address _user) external view returns (uint256) {
@@ -281,46 +283,53 @@ contract LaunchPoolFundRaisingWithVesting is Ownable {
         pool.lastRewardBlock = maxEndBlock;
     }
 
+    function claimReward(uint256 _pid) public { //todo non reentrant
+        updatePool(_pid);
 
-//    function withdraw(uint256 _pid, uint256 _amount) external {
-//        PoolInfo storage pool = poolInfo[_pid];
-//        UserInfo storage user = userInfo[_pid][msg.sender];
-//
-//        require(user.amount >= _amount, "withdraw: _amount not good");
-//
-//        updatePool(_pid);
-//
-//        uint256 pending = user.amount.mul(pool.accRewardPerShare).div(1e18).sub(user.rewardDebt);
-//        if (pending > 0) {
-//            safeRewardTransfer(pool.rewardToken, msg.sender, pending);
-//        }
-//
-//        if (_amount > 0) {
-//            user.amount = user.amount.sub(_amount);
-//            pool.totalStaked = pool.totalStaked.sub(_amount);
-//            stakingToken.safeTransfer(address(msg.sender), _amount);
-//        }
-//
-//        user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
-//        //emit Withdraw(msg.sender, _pid, _amount);
-//    }
+        UserInfo storage user = userInfo[_pid][msg.sender];
+        require(user.pledgeFundingAmount > 0, "claimReward: Nice try pal");
 
-//    /// @notice Emergency only. Should the rewards issuance mechanism fail, people can still withdraw their stake
-//    /// @param _pid Pool ID
-//    function emergencyWithdraw(uint256 _pid) external {
-//        require(_pid < poolInfo.length, "updatePool: invalid _pid");
-//
-//        PoolInfo storage pool = poolInfo[_pid];
-//        UserInfo storage user = userInfo[_pid][msg.sender];
-//
-//        uint256 amount = user.amount;
-//        user.amount = 0;
-//        user.rewardDebt = 0;
-//
-//        pool.totalStaked = pool.totalStaked.sub(amount);
-//        stakingToken.safeTransfer(address(msg.sender), amount);
-//        //emit EmergencyWithdraw(msg.sender, _pid, amount);
-//    }
+        PoolInfo storage pool = poolInfo[_pid];
+        uint256 pending = user.amount.mul(pool.accRewardPerShare).div(1e18).sub(user.rewardDebt);
+        if (pending > 0) {
+            user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
+            safeRewardTransfer(pool.rewardToken, msg.sender, pending);
+        }
+
+        // todo emit event
+    }
+
+    // withdraw only permitted post `pledgeFundingEndBlock` and you can only take out full amount regardless of whether you have funded your pledge
+    // functions like the old emergency withdraw as it does not concern itself with claiming rewards
+    function withdraw(uint256 _pid) external {
+        require(_pid < poolInfo.length, "withdraw: invalid _pid");
+
+        PoolInfo storage pool = poolInfo[_pid];
+        UserInfo storage user = userInfo[_pid][msg.sender];
+
+        require(user.amount > 0, "withdraw: Nothing to see here");
+        require(user.stakeWithdrawn == false, "withdraw: Stake already withdrawn");
+
+        user.stakeWithdrawn = true;
+
+        stakingToken.safeTransfer(address(msg.sender), user.amount);
+
+        // todo event
+        //emit Withdraw(msg.sender, _pid, _amount);
+    }
+
+    function claimFundRaising(uint256 _pid) external { // todo non reentrant
+        require(_pid < poolInfo.length, "claimFundRaising: invalid _pid");
+        PoolInfo storage pool = poolInfo[_pid];
+
+        require(pool.fundsClaimed == false, "claimFundRaising: Already claimed funds");
+        require(msg.sender == pool.fundRaisingRecipient, "claimFundRaising: Only fundraising recipient");
+
+        pool.fundsClaimed = true;
+        pool.fundRaisingRecipient.call{value: pool.totalRaised}("");
+
+        // todo event
+    }
 
     ////////////
     // Private /
