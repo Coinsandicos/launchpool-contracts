@@ -19,7 +19,7 @@ async function main() {
   );
 
   const pools = [
-    [0, '0', '0x8c8687fC965593DFb2F0b4EAeFD55E9D8df348df', 10000000], // Old paid
+    [3, '0', '0x8c8687fC965593DFb2F0b4EAeFD55E9D8df348df', 10000000], // Old paid
     [17, Math.trunc((6.1765 + 2.9412 + 1.4705) * 10000), '0xa85be3676C951EBC82C89782aBA8da6089D69cb5', 5],  // LP8
   ];
 
