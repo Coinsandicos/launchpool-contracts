@@ -320,6 +320,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         require(_pid < poolInfo.length, "claimFundRaising: invalid _pid");
         PoolInfo storage pool = poolInfo[_pid];
 
+        require(pool.rewardPerBlock != 0, "claimFundRaising: rewards not yet sent");
         require(pool.fundsClaimed == false, "claimFundRaising: Already claimed funds");
         require(msg.sender == pool.fundRaisingRecipient, "claimFundRaising: Only fundraising recipient");
 

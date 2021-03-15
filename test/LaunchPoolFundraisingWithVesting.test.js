@@ -27,6 +27,10 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
   const toBn = (value) => new BN(value);
 
+  const txFee = ({gasUsed}) => {
+    return toBn(gasUsed).mul(toBn(8000000000))
+  }
+
   const TEN_TOKENS = to18DP('10');
   const ONE_THOUSAND_TOKENS = to18DP('1000');
   const TEN_THOUSAND_TOKENS = ONE_THOUSAND_TOKENS.muln(10);
@@ -361,6 +365,92 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         const aliceRewardTokenBalAfterClaim = await this.rewardToken1.balanceOf(alice)
 
         shouldBeNumberInEtherCloseTo(aliceRewardTokenBalAfterClaim.sub(aliceRewardTokenBalBeforeClaim), fromWei(totalRewardsAlice))
+      })
+    })
+  })
+
+  describe.only('claimFundRaising()', () => {
+    describe('When a project is fully funded', () => {
+      beforeEach(async () => {
+        // set up and fully fund a project
+        this.currentBlock = await time.latestBlock();
+
+        // create reward token for fund raising
+        this.rewardToken1 = await MockERC20.new(
+          'Reward1',
+          'Reward1',
+          ONE_HUNDRED_THOUSAND_TOKENS,
+          {from: project1Admin}
+        )
+
+        this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+        this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+        this.project1TargetRaise = ether('100')
+
+        await this.fundRaising.add(
+          this.rewardToken1.address,
+          this.stakingEndBlock,
+          this.pledgeFundingEndBlock,
+          this.project1TargetRaise,
+          project1Admin,
+          false,
+          {from: deployer}
+        )
+
+        // let alice and bob pledge funding by staking LPOOL
+        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice) // Alice will have to fund 2/3 of the target raise
+        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS.divn(2), bob) // Bob will have to fund 1/3
+
+        // move past staking end
+        await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
+
+        // fund the pledge
+        await fundPledge(POOL_ZERO, alice)
+        await fundPledge(POOL_ZERO, bob)
+
+        // move past funding period
+        const _1BlockPastFundingEndBlock = this.pledgeFundingEndBlock.add(toBn('1'))
+        await time.advanceBlockTo(_1BlockPastFundingEndBlock);
+
+        // ensure fund raising cannot be claimed before rewards are sent
+        await expectRevert(
+          this.fundRaising.claimFundRaising(POOL_ZERO, {from: project1Admin}),
+          "claimFundRaising: rewards not yet sent"
+        )
+
+        // Project admin sends the rewards tokens in relation to raise
+        await setupVestingRewards(
+          POOL_ZERO,
+          this.rewardToken1,
+          ONE_HUNDRED_THOUSAND_TOKENS,
+          _1BlockPastFundingEndBlock.add(toBn('100')), // 1k tokens a block
+          this.pledgeFundingEndBlock.add(toBn('1')),
+          project1Admin
+        )
+      })
+
+      it('Can claim the raised funds', async () => {
+        const project1AdminBalanceTracker = await balance.tracker(project1Admin)
+
+        const {receipt} = await this.fundRaising.claimFundRaising(POOL_ZERO, {from: project1Admin})
+
+        let {raised} = (await this.fundRaising.getTotalRaisedVsTarget(POOL_ZERO, {from: alice}))
+        expect(await project1AdminBalanceTracker.delta()).to.be.bignumber.equal(raised.sub(txFee(receipt)))
+      })
+
+      it('Reverts when rewards have already been claimed', async () => {
+        await this.fundRaising.claimFundRaising(POOL_ZERO, {from: project1Admin})
+        await expectRevert(
+          this.fundRaising.claimFundRaising(POOL_ZERO, {from: project1Admin}),
+          "claimFundRaising: Already claimed funds"
+        )
+      })
+
+      it('Reverts when sender is not the project admin', async () => {
+        await expectRevert(
+          this.fundRaising.claimFundRaising(POOL_ZERO, {from: bob}),
+          "claimFundRaising: Only fundraising recipient"
+        )
       })
     })
   })
