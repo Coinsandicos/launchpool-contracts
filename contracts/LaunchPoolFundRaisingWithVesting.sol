@@ -4,7 +4,6 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -22,7 +21,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     /// @dev Details about each user in a pool
     struct UserInfo {
         uint256 amount;     // How many tokens are staked in a pool
-        uint256 pledgeFundingAmount;
+        uint256 pledgeFundingAmount; // Based on staked tokens, the funding that has come from the user (or not if they choose to pull out)
         bool stakeWithdrawn; // Set to true if the staked amount is withdrawn after the deposit deadline. No more withdrawals permitted!!
         uint256 rewardDebt; // Reward debt. See explanation below.
         //
@@ -38,18 +37,18 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     struct PoolInfo {
         IERC20 rewardToken; // Address of the reward token contract.
         uint256 rewardPerBlock; // Number of reward tokens distributed per block for this pool
-        uint256 stakingEndBlock;
-        uint256 pledgeFundingEndBlock;
-        uint256 lastRewardBlock; // Last block number that reward token distribution or vesting start block up to end block
-        uint256 rewardEndBlock;
-        uint256 accRewardPerShare; // Per LP token staked, how much reward token earned in pool that users will get
-        uint256 maxRewardTokenAvailableForVesting;
-        uint256 targetRaise;
-        uint256 totalStaked;
-        uint256 totalRaised;
-        uint256 totalStakeThatHasFundedPledge;
-        address payable fundRaisingRecipient;
-        bool fundsClaimed;
+        uint256 stakingEndBlock; // Before this block, staking is permitted
+        uint256 pledgeFundingEndBlock; // Between stakingEndBlock and this number pledge funding is permitted
+        uint256 lastRewardBlock; // Last block number that reward token distribution took place
+        uint256 rewardEndBlock; // Block number when rewards end
+        uint256 accRewardPerShare; // Per LPOOL token staked, how much reward token earned in pool that users will get
+        uint256 maxRewardTokenAvailableForVesting; // Total rewards being distributed up to rewardEndBlock
+        uint256 targetRaise; // Amount that the project wishes to raise
+        uint256 totalStaked; // Total amount staked into the pool
+        uint256 totalRaised; // Total amount of funding received by stakers after stakingEndBlock and before pledgeFundingEndBlock
+        uint256 totalStakeThatHasFundedPledge; // The stake that has funded their pledge which could be lower than total staked
+        address payable fundRaisingRecipient; // The account that can claim the funds raised
+        bool fundsClaimed; // True when funds have been claimed
     }
 
     /// @notice staking token is fixed for all pools
@@ -65,7 +64,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     /// @notice Pool ID => User Address => User Info
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
 
-    event ContractDeployed();
+    event ContractDeployed(address indexed guildBank);
     event PoolAdded(uint256 indexed pid);
     event Pledge(address indexed user, uint256 indexed pid, uint256 amount);
     event PledgeFunded(address indexed user, uint256 indexed pid, uint256 amount);
@@ -81,7 +80,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         stakingToken = _stakingToken;
         rewardGuildBank = new FundRaisingGuild(address(this));
 
-        emit ContractDeployed();
+        emit ContractDeployed(address(rewardGuildBank));
     }
 
     /// @notice Returns the number of pools that have been added by the owner
@@ -90,7 +89,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         return poolInfo.length;
     }
 
-    /// @notice Create a new reward pool by whitelisting a new ERC20 token.
     /// @dev Can only be called by the contract owner
     function add(
         IERC20 _rewardToken,
@@ -174,8 +172,8 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     // pre-step 2 for staker
     function getPledgeFundingAmount(uint256 _pid) public view returns (uint256) {
         require(_pid < poolInfo.length, "getPledgeFundingAmount: Invalid PID");
-        PoolInfo storage pool = poolInfo[_pid];
-        UserInfo storage user = userInfo[_pid][msg.sender];
+        PoolInfo memory pool = poolInfo[_pid];
+        UserInfo memory user = userInfo[_pid][msg.sender];
 
         uint256 targetRaiseForPool = pool.targetRaise.mul(1e18);
         uint256 raisePerShare = targetRaiseForPool.div(pool.totalStaked);
@@ -233,8 +231,8 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     function pendingRewards(uint256 _pid, address _user) external view returns (uint256) {
         require(_pid < poolInfo.length, "pendingRewards: invalid _pid");
 
-        PoolInfo storage pool = poolInfo[_pid];
-        UserInfo storage user = userInfo[_pid][_user];
+        PoolInfo memory pool = poolInfo[_pid];
+        UserInfo memory user = userInfo[_pid][_user];
 
         // If they have staked but have not funded their pledge, they are not entitled to rewards
         if (user.pledgeFundingAmount == 0) {
@@ -309,6 +307,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
         require(user.amount > 0, "withdraw: Nothing to see here");
         require(user.stakeWithdrawn == false, "withdraw: Stake already withdrawn");
+        require(block.number > pool.pledgeFundingEndBlock, "withdraw: Not yet permitted");
 
         user.stakeWithdrawn = true;
 
