@@ -8,7 +8,7 @@ async function main() {
     await deployer.getAddress()
   );
 
-  const stakingAddress = prompt('Staking address? ');
+  const stakingAddress = prompt('Staking address? '); // orig: 0x8A1ba492c2A0B5aF4c910A70D53BF8bb76C9A4c0
 
   console.log('Staking', stakingAddress);
 
