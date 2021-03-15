@@ -454,4 +454,102 @@ contract('LaunchPoolFundRaisingWithVesting', ([
       })
     })
   })
+
+  describe.only('withdraw', () => {
+    beforeEach(async () => {
+      this.currentBlock = await time.latestBlock();
+
+      // create reward token for fund raising
+      this.rewardToken1 = await MockERC20.new(
+        'Reward1',
+        'Reward1',
+        ONE_HUNDRED_THOUSAND_TOKENS,
+        {from: project1Admin}
+      )
+
+      this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+      this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+      this.project1TargetRaise = ether('100')
+
+      await this.fundRaising.add(
+        this.rewardToken1.address,
+        this.stakingEndBlock,
+        this.pledgeFundingEndBlock,
+        this.project1TargetRaise,
+        project1Admin,
+        false,
+        {from: deployer}
+      )
+
+      // let alice pledge funding by staking LPOOL
+      await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice)
+    })
+
+    it('Can withdraw if funded pledge after pledgeFundingEndBlock', async () => {
+      await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
+
+      // fund the pledge
+      await fundPledge(POOL_ZERO, alice)
+
+      // move past funding period
+      const _1BlockPastFundingEndBlock = this.pledgeFundingEndBlock.add(toBn('1'))
+      await time.advanceBlockTo(_1BlockPastFundingEndBlock);
+
+      const aliceLpoolBalBefore = await this.launchPoolToken.balanceOf(alice)
+
+      await this.fundRaising.withdraw(POOL_ZERO, {from: alice})
+
+      const aliceLpoolBalAfter = await this.launchPoolToken.balanceOf(alice)
+
+      expect(aliceLpoolBalAfter.sub(aliceLpoolBalBefore)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS)
+    })
+
+    it('Can withdraw if not funded pledge after pledgeFundingEndBlock', async () => {
+      // move past funding period
+      const _1BlockPastFundingEndBlock = this.pledgeFundingEndBlock.add(toBn('1'))
+      await time.advanceBlockTo(_1BlockPastFundingEndBlock);
+
+      const aliceLpoolBalBefore = await this.launchPoolToken.balanceOf(alice)
+
+      await this.fundRaising.withdraw(POOL_ZERO, {from: alice})
+
+      const aliceLpoolBalAfter = await this.launchPoolToken.balanceOf(alice)
+
+      expect(aliceLpoolBalAfter.sub(aliceLpoolBalBefore)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS)
+    })
+
+    it('Reverts when withdrawing after staking', async () => {
+      await expectRevert(
+        this.fundRaising.withdraw(POOL_ZERO, {from: alice}),
+        "withdraw: Not yet permitted"
+      )
+    })
+
+    it('Reverts when withdrawing after staking ends but before end of pledge funding', async () => {
+      await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
+      await expectRevert(
+        this.fundRaising.withdraw(POOL_ZERO, {from: alice}),
+        "withdraw: Not yet permitted"
+      )
+    })
+
+    it('Reverts when withdrawing twice', async () => {
+      const _1BlockPastFundingEndBlock = this.pledgeFundingEndBlock.add(toBn('5'))
+      await time.advanceBlockTo(_1BlockPastFundingEndBlock);
+
+      await this.fundRaising.withdraw(POOL_ZERO, {from: alice})
+
+      await expectRevert(
+        this.fundRaising.withdraw(POOL_ZERO, {from: alice}),
+        "withdraw: Stake already withdrawn"
+      )
+    })
+
+    it('Reverts when user has not staked', async () => {
+      await expectRevert(
+        this.fundRaising.withdraw(POOL_ZERO, {from: daniel}),
+        "withdraw: Nothing to see here"
+      )
+    })
+  })
 })
