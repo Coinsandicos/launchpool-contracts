@@ -522,6 +522,144 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
+  describe.only('fundPledge()', () => {
+    it('Reverts when invalid PID', async () => {
+      await expectRevert(
+        this.fundRaising.fundPledge('99'),
+        "fundPledge: Invalid PID"
+      )
+    })
+
+    it('Reverts when pledge has already been funded', async () => {
+      // create reward token for fund raising
+      this.rewardToken1 = await MockERC20.new(
+        'Reward1',
+        'Reward1',
+        ONE_HUNDRED_THOUSAND_TOKENS,
+        {from: project1Admin}
+      )
+
+      this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+      this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+      this.project1TargetRaise = ether('100')
+
+      await this.fundRaising.add(
+        this.rewardToken1.address,
+        this.stakingEndBlock,
+        this.pledgeFundingEndBlock,
+        this.project1TargetRaise,
+        project1Admin,
+        false,
+        {from: deployer}
+      )
+
+      await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice)
+
+      await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
+
+      // fund the pledge
+      await fundPledge(POOL_ZERO, alice)
+
+      await expectRevert(
+        this.fundRaising.fundPledge(POOL_ZERO, {from: alice}),
+        "fundPledge: Pledge has already been funded"
+      )
+    })
+
+    it('Reverts when staking is still taking place', async () => {
+// create reward token for fund raising
+      this.rewardToken1 = await MockERC20.new(
+        'Reward1',
+        'Reward1',
+        ONE_HUNDRED_THOUSAND_TOKENS,
+        {from: project1Admin}
+      )
+
+      this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+      this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+      this.project1TargetRaise = ether('100')
+
+      await this.fundRaising.add(
+        this.rewardToken1.address,
+        this.stakingEndBlock,
+        this.pledgeFundingEndBlock,
+        this.project1TargetRaise,
+        project1Admin,
+        false,
+        {from: deployer}
+      )
+
+      await expectRevert(
+        this.fundRaising.fundPledge(POOL_ZERO, {from: alice}),
+        "fundPledge: Staking is still taking place"
+      )
+    })
+
+    it('Reverts when deadline for funding a pledge has passed', async () => {
+      // create reward token for fund raising
+      this.rewardToken1 = await MockERC20.new(
+        'Reward1',
+        'Reward1',
+        ONE_HUNDRED_THOUSAND_TOKENS,
+        {from: project1Admin}
+      )
+
+      this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+      this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+      this.project1TargetRaise = ether('100')
+
+      await this.fundRaising.add(
+        this.rewardToken1.address,
+        this.stakingEndBlock,
+        this.pledgeFundingEndBlock,
+        this.project1TargetRaise,
+        project1Admin,
+        false,
+        {from: deployer}
+      )
+
+      await time.advanceBlockTo(this.pledgeFundingEndBlock.add(toBn('1')))
+
+      await expectRevert(
+        this.fundRaising.fundPledge(POOL_ZERO, {from: alice}),
+        "fundPledge: Deadline has passed to fund your pledge"
+      )
+    })
+
+    it('Reverts when invalid eth amount sent', async () => {
+// create reward token for fund raising
+      this.rewardToken1 = await MockERC20.new(
+        'Reward1',
+        'Reward1',
+        ONE_HUNDRED_THOUSAND_TOKENS,
+        {from: project1Admin}
+      )
+
+      this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+      this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+      this.project1TargetRaise = ether('100')
+
+      await this.fundRaising.add(
+        this.rewardToken1.address,
+        this.stakingEndBlock,
+        this.pledgeFundingEndBlock,
+        this.project1TargetRaise,
+        project1Admin,
+        false,
+        {from: deployer}
+      )
+
+      await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice)
+
+      await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
+
+      await expectRevert(
+        this.fundRaising.fundPledge(POOL_ZERO, {from: alice, value: '5'}),
+        "fundPledge: Required ETH amount not satisfied"
+      )
+    })
+  })
+
   describe.only('claimFundRaising()', () => {
     describe('When a project is fully funded', () => {
       beforeEach(async () => {
