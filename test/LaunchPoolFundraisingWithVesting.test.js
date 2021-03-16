@@ -726,6 +726,88 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
+  describe.only('pendingRewards()', () => {
+    it('Returns zero when user has not funded a pledge', async () => {
+      this.rewardToken1 = await MockERC20.new(
+        'Reward1',
+        'Reward1',
+        ONE_HUNDRED_THOUSAND_TOKENS,
+        {from: project1Admin}
+      )
+
+      this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+      this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+      this.project1TargetRaise = ether('100')
+
+      await this.fundRaising.add(
+        this.rewardToken1.address,
+        this.stakingEndBlock,
+        this.pledgeFundingEndBlock,
+        this.project1TargetRaise,
+        project1Admin,
+        false,
+        {from: deployer}
+      )
+
+      const pendingRewards = await this.fundRaising.pendingRewards(POOL_ZERO, alice)
+      expect(pendingRewards).to.be.bignumber.equal('0')
+    })
+  })
+
+  describe.only('claimReward()', () => {
+    beforeEach(async () => {
+      this.rewardToken1 = await MockERC20.new(
+        'Reward1',
+        'Reward1',
+        ONE_HUNDRED_THOUSAND_TOKENS,
+        {from: project1Admin}
+      )
+
+      this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+      this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+      this.project1TargetRaise = ether('100')
+
+      await this.fundRaising.add(
+        this.rewardToken1.address,
+        this.stakingEndBlock,
+        this.pledgeFundingEndBlock,
+        this.project1TargetRaise,
+        project1Admin,
+        false,
+        {from: deployer}
+      )
+    })
+
+    it('Reverts when user has not funded their pledge', async () => {
+      await expectRevert(
+        this.fundRaising.claimReward(POOL_ZERO),
+        "claimReward: Nice try pal"
+      )
+    })
+
+    it('When rewards have not been set up, no rewards issued', async () => {
+      await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice)
+
+      // move past staking end
+      await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
+
+      // fund the pledge
+      await fundPledge(POOL_ZERO, alice)
+
+      // move past funding period
+      const _1BlockPastFundingEndBlock = this.pledgeFundingEndBlock.add(toBn('1'))
+      await time.advanceBlockTo(_1BlockPastFundingEndBlock);
+
+      const aliceRewardBalBefore = await this.rewardToken1.balanceOf(alice)
+
+      await this.fundRaising.claimReward(POOL_ZERO, {from: alice})
+
+      const aliceRewardBalAfter = await this.rewardToken1.balanceOf(alice)
+
+      expect(aliceRewardBalAfter.sub(aliceRewardBalBefore)).to.be.bignumber.equal('0')
+    })
+  })
+
   describe.only('claimFundRaising()', () => {
     describe('When a project is fully funded', () => {
       beforeEach(async () => {

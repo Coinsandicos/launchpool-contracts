@@ -291,9 +291,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         if (pending > 0) {
             user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
             safeRewardTransfer(pool.rewardToken, msg.sender, pending);
-        }
 
-        emit RewardClaimed(msg.sender, _pid, pending);
+            emit RewardClaimed(msg.sender, _pid, pending);
+        }
     }
 
     // withdraw only permitted post `pledgeFundingEndBlock` and you can only take out full amount regardless of whether you have funded your pledge
