@@ -140,6 +140,16 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     this.currentBlock = await time.latestBlock();
   })
 
+  it('Deployment reverts when staking token is zero', async () => {
+    await expectRevert(
+      LaunchPoolFundRaisingWithVesting.new(
+        constants.ZERO_ADDRESS,
+        {from: deployer}
+      ),
+      "constructor: _stakingToken must not be zero address"
+    )
+  })
+
   describe.only('Fund raising end to end flow', () => {
     describe('With 1 pool set up', () => {
       beforeEach(async () => {
@@ -381,6 +391,64 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         const expectedRewards = poolZeroInfo.rewardPerBlock.muln(2).divn(3) // alice gets 2/3 of rewards
         shouldBeNumberInEtherCloseTo(pendingRewardsAlice, fromWei(expectedRewards))
       })
+    })
+  })
+
+  describe.only('add()', () => {
+    it('Reverts when reward token is zero address', async () => {
+      await expectRevert(
+        this.fundRaising.add(
+          constants.ZERO_ADDRESS,
+          0,
+          1,
+          1,
+          project1Admin,
+          false
+        ),
+        "add: _rewardToken is zero address"
+      )
+    })
+
+    it('Reverts when staking end block is after pledge funding end block', async () => {
+      await expectRevert(
+        this.fundRaising.add(
+          this.launchPoolToken.address,
+          2,
+          1,
+          1,
+          project1Admin,
+          false
+        ),
+        "add: staking end must be before funding end"
+      )
+    })
+
+    it('Reverts when target raise is zero', async () => {
+      await expectRevert(
+        this.fundRaising.add(
+          this.launchPoolToken.address,
+          1,
+          2,
+          0,
+          project1Admin,
+          false
+        ),
+        "add: Invalid raise amount"
+      )
+    })
+
+    it('Reverts when fund raising recipient is address zero', async () => {
+      await expectRevert(
+        this.fundRaising.add(
+          this.launchPoolToken.address,
+          1,
+          2,
+          1,
+          constants.ZERO_ADDRESS,
+          false
+        ),
+        "add: _fundRaisingRecipient is zero address"
+      )
     })
   })
 
