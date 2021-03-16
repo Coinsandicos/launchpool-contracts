@@ -303,9 +303,11 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.pledgeFundingEndBlockProject2,
           this.project2TargetRaise,
           project2Admin,
-          false,
+          true,
           {from: deployer}
         )
+
+        expect(await this.fundRaising.numberOfPools()).to.be.bignumber.equal('2')
       })
 
       it('Can fund the second project whilst users draw down from the first', async () => {
@@ -338,11 +340,17 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         const poolInfoAfterSettingUpRewards = await this.fundRaising.poolInfo(POOL_ONE);
         await time.advanceBlockTo(poolInfoAfterSettingUpRewards.lastRewardBlock.addn(4));
 
-        // 5 blocks of rewards should be available
-        await this.fundRaising.claimReward(POOL_ONE, {from: daniel})
+        const totalRewardsForDanielAndEdAfter4Blocks = poolInfoAfterSettingUpRewards.rewardPerBlock.muln(4)
+        const totalRewardsDanielPreClaim = totalRewardsForDanielAndEdAfter4Blocks.divn(2)
+
+        const pendingRewards = await this.fundRaising.pendingRewards(POOL_ONE, daniel)
+        shouldBeNumberInEtherCloseTo(pendingRewards, fromWei(totalRewardsDanielPreClaim))
 
         const totalRewardsForDanielAndEdAfter5Blocks = poolInfoAfterSettingUpRewards.rewardPerBlock.muln(5)
         const totalRewardsDaniel = totalRewardsForDanielAndEdAfter5Blocks.divn(2)
+
+        // 5 blocks of rewards should be available
+        await this.fundRaising.claimReward(POOL_ONE, {from: daniel})
 
         const danielRewardTokenBalAfterClaim = await this.rewardToken2.balanceOf(daniel)
 
@@ -365,6 +373,13 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         const aliceRewardTokenBalAfterClaim = await this.rewardToken1.balanceOf(alice)
 
         shouldBeNumberInEtherCloseTo(aliceRewardTokenBalAfterClaim.sub(aliceRewardTokenBalBeforeClaim), fromWei(totalRewardsAlice))
+
+        // update all the pools and there should be more rewards
+        await this.fundRaising.massUpdatePools()
+
+        const pendingRewardsAlice = await this.fundRaising.pendingRewards(POOL_ZERO, alice)
+        const expectedRewards = poolZeroInfo.rewardPerBlock.muln(2).divn(3) // alice gets 2/3 of rewards
+        shouldBeNumberInEtherCloseTo(pendingRewardsAlice, fromWei(expectedRewards))
       })
     })
   })
