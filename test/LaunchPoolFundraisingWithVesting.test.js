@@ -660,6 +660,72 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
+  describe.only('setupVestingRewards()', () => {
+    it('Reverts when invalid PID', async () => {
+      await expectRevert(
+        this.fundRaising.setupVestingRewards('999', '2', '3'),
+        "setupVestingRewards: Invalid PID"
+      )
+    })
+
+    describe('with pool that is set up', () => {
+      beforeEach(async () => {
+        this.currentBlock = await time.latestBlock();
+
+        // create reward token for fund raising
+        this.rewardToken1 = await MockERC20.new(
+          'Reward1',
+          'Reward1',
+          ONE_HUNDRED_THOUSAND_TOKENS,
+          {from: project1Admin}
+        )
+
+        this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+        this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+        this.project1TargetRaise = ether('100')
+
+        await this.fundRaising.add(
+          this.rewardToken1.address,
+          this.stakingEndBlock,
+          this.pledgeFundingEndBlock,
+          this.project1TargetRaise,
+          project1Admin,
+          false,
+          {from: deployer}
+        )
+      })
+
+      it('Reverts when reward end block is in the past', async () => {
+        await expectRevert(
+          this.fundRaising.setupVestingRewards(POOL_ZERO, '2', '3'),
+          "setupVestingRewards: end block in the past"
+        )
+      })
+
+      it('Reverts when stakers are still pledging', async () => {
+        this.currentBlock = await time.latestBlock();
+        const rewardEnd = this.currentBlock.add(toBn('500'))
+
+        await expectRevert(
+          this.fundRaising.setupVestingRewards(POOL_ZERO, ONE_HUNDRED_THOUSAND_TOKENS, rewardEnd),
+          "setupVestingRewards: Stakers are still pledging"
+        )
+      })
+
+      it('Reverts when not fund raising recipient', async () => {
+        this.currentBlock = await time.latestBlock();
+        const rewardEnd = this.currentBlock.add(toBn('500'))
+
+        await time.advanceBlockTo(this.pledgeFundingEndBlock.add(toBn('2')))
+
+        await expectRevert(
+          this.fundRaising.setupVestingRewards(POOL_ZERO, ONE_HUNDRED_THOUSAND_TOKENS, rewardEnd, {from: daniel}),
+          "setupVestingRewards: Only fund raising recipient"
+        )
+      })
+    })
+  })
+
   describe.only('claimFundRaising()', () => {
     describe('When a project is fully funded', () => {
       beforeEach(async () => {
