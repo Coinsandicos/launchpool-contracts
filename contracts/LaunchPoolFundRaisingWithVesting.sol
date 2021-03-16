@@ -104,7 +104,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         require(_targetRaise > 0, "add: Invalid raise amount");
         require(_fundRaisingRecipient != address(0), "add: _fundRaisingRecipient is zero address");
 
-        // todo: does mass update make sense here?
         if (_withUpdate) {
             massUpdatePools();
         }

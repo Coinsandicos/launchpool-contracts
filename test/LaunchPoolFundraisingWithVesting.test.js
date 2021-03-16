@@ -452,6 +452,76 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
+  describe.only('pledge()', () => {
+    it('Reverts when invalid PID', async () => {
+      await expectRevert(
+        this.fundRaising.pledge('99', '1'),
+        "pledge: Invalid PID"
+      )
+    })
+
+    it('Reverts when amount is zero', async () => {
+      // create reward token for fund raising
+      this.rewardToken1 = await MockERC20.new(
+        'Reward1',
+        'Reward1',
+        ONE_HUNDRED_THOUSAND_TOKENS,
+        {from: project1Admin}
+      )
+
+      this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+      this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+      this.project1TargetRaise = ether('100')
+
+      await this.fundRaising.add(
+        this.rewardToken1.address,
+        this.stakingEndBlock,
+        this.pledgeFundingEndBlock,
+        this.project1TargetRaise,
+        project1Admin,
+        false,
+        {from: deployer}
+      )
+
+      await expectRevert(
+        this.fundRaising.pledge(POOL_ZERO, '0'),
+        "pledge: No pledge specified"
+      )
+    })
+
+    it('Reverts when staking after staking end block', async () => {
+      // create reward token for fund raising
+      this.rewardToken1 = await MockERC20.new(
+        'Reward1',
+        'Reward1',
+        ONE_HUNDRED_THOUSAND_TOKENS,
+        {from: project1Admin}
+      )
+
+      this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+      this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+      this.project1TargetRaise = ether('100')
+
+      await this.fundRaising.add(
+        this.rewardToken1.address,
+        this.stakingEndBlock,
+        this.pledgeFundingEndBlock,
+        this.project1TargetRaise,
+        project1Admin,
+        false,
+        {from: deployer}
+      )
+
+      const _1BlockPastFundingEndBlock = this.pledgeFundingEndBlock.add(toBn('1'))
+      await time.advanceBlockTo(_1BlockPastFundingEndBlock);
+
+      await expectRevert(
+        this.fundRaising.pledge(POOL_ZERO, '1'),
+        "pledge: Staking no longer permitted"
+      )
+    })
+  })
+
   describe.only('claimFundRaising()', () => {
     describe('When a project is fully funded', () => {
       beforeEach(async () => {
