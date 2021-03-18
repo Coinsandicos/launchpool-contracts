@@ -52,6 +52,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     /// @notice List of pools that users can stake into
     PoolInfo[] public poolInfo;
 
+    mapping(uint256 => uint256) public poolIdToAccPercentagePerShare;
+    mapping(uint256 => uint256) public poolIdToLastPercentageAllocBlock;
+
     // Number of reward tokens distributed per block for this pool
     mapping(uint256 => uint256) public poolIdToRewardPerBlock;
 
@@ -84,6 +87,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     /// @notice Per pool, info of each user that stakes ERC20 tokens.
     /// @notice Pool ID => User Address => User Info
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
+
+    // Available before staking ends for any given project. Essentitally 100% to 18 dp
+    uint256 public constant TOTAL_TOKEN_ALLOCATION_POINTS = (100 * (10 ** 18));
 
     event ContractDeployed(address indexed guildBank);
     event PoolAdded(uint256 indexed pid);
@@ -140,6 +146,8 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
             fundRaisingRecipient: _fundRaisingRecipient
         }));
 
+        poolIdToLastPercentageAllocBlock[poolInfo.length.sub(1)] = _tokenAllocationStartBlock;
+
         emit PoolAdded(poolInfo.length.sub(1));
     }
 
@@ -176,6 +184,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         require(block.number <= pool.stakingEndBlock, "pledge: Staking no longer permitted");
 
         //todo call update pool to do percentage issuance
+        updatePool(_pid);
 
         user.amount = user.amount.add(_amount);
         poolIdToTotalStaked[_pid] = poolIdToTotalStaked[_pid].add(_amount);
@@ -185,17 +194,29 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         emit Pledge(msg.sender, _pid, _amount);
     }
 
-    // pre-step 2 for staker
+    //todo drop this
+//    // pre-step 2 for staker
+//    function getPledgeFundingAmount(uint256 _pid) public view returns (uint256) {
+//        require(_pid < poolInfo.length, "getPledgeFundingAmount: Invalid PID");
+//        PoolInfo memory pool = poolInfo[_pid];
+//        UserInfo memory user = userInfo[_pid][msg.sender];
+//
+//        uint256 targetRaiseForPool = pool.targetRaise.mul(1e18);
+//        uint256 raisePerShare = targetRaiseForPool.div(poolIdToTotalStaked[_pid]);
+//
+//        // todo adjust based on acc percentage per share
+//        return user.amount.mul(raisePerShare).div(1e18);
+//    }
+
     function getPledgeFundingAmount(uint256 _pid) public view returns (uint256) {
         require(_pid < poolInfo.length, "getPledgeFundingAmount: Invalid PID");
         PoolInfo memory pool = poolInfo[_pid];
         UserInfo memory user = userInfo[_pid][msg.sender];
 
-        uint256 targetRaiseForPool = pool.targetRaise.mul(1e18);
-        uint256 raisePerShare = targetRaiseForPool.div(poolIdToTotalStaked[_pid]);
+        (uint256 accPercentPerShare,) = getAccPercentagePerShareAndLastAllocBlock(_pid);
 
-        // todo adjust based on acc percentage per share
-        return user.amount.mul(raisePerShare).div(1e18);
+        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18);
+        return userPercentageAllocated.mul(pool.targetRaise).div(TOTAL_TOKEN_ALLOCATION_POINTS);
     }
 
     // step 2
@@ -280,6 +301,17 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     function updatePool(uint256 _pid) public {
         require(_pid < poolInfo.length, "updatePool: invalid _pid");
 
+        PoolInfo storage poolInfo = poolInfo[_pid];
+        if (block.number < poolInfo.tokenAllocationStartBlock) {
+            return;
+        }
+
+        if(block.number <= poolInfo.stakingEndBlock) {
+            (uint256 accPercentPerShare, uint256 lastAllocBlock) = getAccPercentagePerShareAndLastAllocBlock(_pid);
+            poolIdToAccPercentagePerShare[_pid] = accPercentPerShare;
+            poolIdToLastPercentageAllocBlock[_pid] = lastAllocBlock;
+        }
+
         if (poolIdToRewardEndBlock[_pid] == 0) { // project has not sent rewards
             return;
         }
@@ -297,9 +329,25 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         uint256 rewardPerBlock = poolIdToRewardPerBlock[_pid];
         uint256 reward = multiplier.mul(rewardPerBlock);
 
-        uint256 totalStakeThatHasFundedPledge = poolIdToTotalStakeThatHasFundedPledge[_pid];
+        uint256 totalStakeThatHasFundedPledge = poolIdToTotalStakeThatHasFundedPledge[_pid]; // todo this could be zero and could cause div by zero issues
         poolIdToAccRewardPerShareVesting[_pid] = poolIdToAccRewardPerShareVesting[_pid].add(reward.mul(1e18).div(totalStakeThatHasFundedPledge));
         poolIdToLastRewardBlock[_pid] = maxEndBlock;
+    }
+
+    function getAccPercentagePerShareAndLastAllocBlock(uint256 _pid) internal view returns (uint256 accPercentPerShare, uint256 lastAllocBlock) {
+        PoolInfo memory poolInfo = poolInfo[_pid];
+        uint256 tokenAllocationPeriodInBlocks = poolInfo.stakingEndBlock.sub(poolInfo.tokenAllocationStartBlock);
+
+        uint256 allocationAvailablePerBlock = TOTAL_TOKEN_ALLOCATION_POINTS.div(tokenAllocationPeriodInBlocks);
+
+        uint256 maxEndBlockForPercentAlloc = block.number <= poolInfo.stakingEndBlock ? block.number : poolInfo.stakingEndBlock;
+        uint256 multiplier = getMultiplier(poolIdToLastPercentageAllocBlock[_pid], maxEndBlockForPercentAlloc);
+        uint256 totalPercentageUnlocked = multiplier.mul(allocationAvailablePerBlock);
+
+        return (
+            poolIdToAccPercentagePerShare[_pid].add(totalPercentageUnlocked.mul(1e18).div(poolIdToTotalStaked[_pid])),
+            maxEndBlockForPercentAlloc
+        );
     }
 
     function claimReward(uint256 _pid) public nonReentrant {

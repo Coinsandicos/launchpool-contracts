@@ -153,6 +153,8 @@ contract('LaunchPoolFundRaisingWithVesting', ([
   describe.only('Fund raising end to end flow', () => {
     describe('With 1 pool set up', () => {
       beforeEach(async () => {
+        this.currentBlock = await time.latestBlock();
+
         // create reward token for fund raising
         this.rewardToken1 = await MockERC20.new(
           'Reward1',
@@ -161,7 +163,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           {from: project1Admin}
         )
 
-        this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+        this.stakingEndBlock = this.currentBlock.add(toBn('110'))
         this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
         this.project1TargetRaise = ether('100')
 
