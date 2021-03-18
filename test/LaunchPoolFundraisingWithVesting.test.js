@@ -47,7 +47,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
   };
 
   const pledge = async (poolId, amount, sender) => {
-    const poolInfoBefore = await this.fundRaising.poolInfo(poolId)
+    const totalStakedBefore = await this.fundRaising.poolIdToTotalStaked(poolId)
 
     await this.launchPoolToken.approve(this.fundRaising.address, amount, {from: sender})
     const {receipt} = await this.fundRaising.pledge(poolId, amount, {from: sender})
@@ -61,12 +61,13 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     const {amount: pledgedAmount} = await this.fundRaising.userInfo(poolId, sender)
     expect(pledgedAmount).to.be.bignumber.equal(amount)
 
-    const poolInfoAfter = await this.fundRaising.poolInfo(poolId)
-    expect(poolInfoAfter.totalStaked.sub(poolInfoBefore.totalStaked)).to.be.bignumber.equal(amount)
+    const totalStakedAfter = await this.fundRaising.poolIdToTotalStaked(poolId)
+    expect(totalStakedAfter.sub(totalStakedBefore)).to.be.bignumber.equal(amount)
   }
 
   const fundPledge = async (poolId, sender) => {
-    const poolInfoBefore = await this.fundRaising.poolInfo(poolId)
+    const totalRaisedBefore = await this.fundRaising.poolIdToTotalRaised(poolId)
+    const totalStakeThatHasFundedPledgeBefore = await this.fundRaising.poolIdToTotalStakeThatHasFundedPledge(poolId)
     const contractEthBalance = await balance.tracker(this.fundRaising.address)
 
     const pledgeFundingAmount = await this.fundRaising.getPledgeFundingAmount(poolId, {from: sender})
@@ -81,9 +82,10 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     const {pledgeFundingAmount: fundingCommited, amount} = await this.fundRaising.userInfo(poolId, sender)
     expect(fundingCommited).to.be.bignumber.equal(pledgeFundingAmount)
 
-    const poolInfoAfter = await this.fundRaising.poolInfo(poolId)
-    expect(poolInfoAfter.totalRaised.sub(poolInfoBefore.totalRaised)).to.be.bignumber.equal(pledgeFundingAmount)
-    expect(poolInfoAfter.totalStakeThatHasFundedPledge.sub(poolInfoBefore.totalStakeThatHasFundedPledge)).to.be.bignumber.equal(amount)
+    const totalRaisedAfter = await this.fundRaising.poolIdToTotalRaised(poolId)
+    const totalStakeThatHasFundedPledgeAfter = await this.fundRaising.poolIdToTotalStakeThatHasFundedPledge(poolId)
+    expect(totalRaisedAfter.sub(totalRaisedBefore)).to.be.bignumber.equal(pledgeFundingAmount)
+    expect(totalStakeThatHasFundedPledgeAfter.sub(totalStakeThatHasFundedPledgeBefore)).to.be.bignumber.equal(amount)
     expect(await contractEthBalance.delta()).to.be.bignumber.equal(pledgeFundingAmount)
   }
 
@@ -109,12 +111,10 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
     expect(guildTokenBalAfter.sub(guildTokenBalBefore)).to.be.bignumber.equal(rewardAmount)
 
-    const {
-      maxRewardTokenAvailableForVesting,
-      rewardPerBlock,
-      lastRewardBlock,
-      rewardEndBlock: rewardEndBlockFromPoolInfo
-    } = await this.fundRaising.poolInfo(poolId)
+    const maxRewardTokenAvailableForVesting = await this.fundRaising.poolIdToMaxRewardTokensAvailableForVesting(poolId)
+    const rewardPerBlock = await this.fundRaising.poolIdToRewardPerBlock(poolId)
+    const lastRewardBlock = await this.fundRaising.poolIdToLastRewardBlock(poolId)
+    const rewardEndBlockFromPoolInfo = await this.fundRaising.poolIdToRewardEndBlock(poolId)
 
     expect(maxRewardTokenAvailableForVesting).to.be.bignumber.equal(rewardAmount)
     expect(lastRewardBlock).to.be.bignumber.equal(pledgeFundingEndBlock.add(toBn(3)))
@@ -167,6 +167,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
         await this.fundRaising.add(
           this.rewardToken1.address,
+          this.currentBlock.add(toBn('10')),
           this.stakingEndBlock,
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
@@ -207,13 +208,14 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         )
 
         // rewards will come through after a few blocks
-        const poolInfoAfterSettingUpRewards = await this.fundRaising.poolInfo(POOL_ZERO);
-        await time.advanceBlockTo(poolInfoAfterSettingUpRewards.lastRewardBlock.addn(4));
+        const lastRewardBlockAfterSettingUpRewards = await this.fundRaising.poolIdToLastRewardBlock(POOL_ZERO);
+        await time.advanceBlockTo(lastRewardBlockAfterSettingUpRewards.addn(4));
 
         // 5 blocks of rewards should be available
         await this.fundRaising.claimReward(POOL_ZERO, {from: alice})
 
-        const totalRewardsForAliceAndBobAfter5Blocks = poolInfoAfterSettingUpRewards.rewardPerBlock.muln(5)
+        const poolIdToRewardPerBlock = await this.fundRaising.poolIdToRewardPerBlock(POOL_ZERO)
+        const totalRewardsForAliceAndBobAfter5Blocks = poolIdToRewardPerBlock.muln(5)
         const totalRewardsAlice = totalRewardsForAliceAndBobAfter5Blocks.muln(2).divn(3) // alice gets 2/3
 
         const aliceRewardTokenBalAfterClaim = await this.rewardToken1.balanceOf(alice)
@@ -221,7 +223,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         shouldBeNumberInEtherCloseTo(aliceRewardTokenBalAfterClaim, fromWei(totalRewardsAlice))
 
         // bob claims after 6 blocks
-        const totalRewardsForAliceAndBobAfter6Blocks = poolInfoAfterSettingUpRewards.rewardPerBlock.muln(6)
+        const totalRewardsForAliceAndBobAfter6Blocks = poolIdToRewardPerBlock.muln(6)
         const totalRewardsBob = totalRewardsForAliceAndBobAfter6Blocks.divn(3) // bob gets 1/3
 
         await this.fundRaising.claimReward(POOL_ZERO, {from: bob})
@@ -250,6 +252,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
         await this.fundRaising.add(
           this.rewardToken1.address,
+          this.currentBlock.add(toBn('10')),
           this.stakingEndBlock,
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
@@ -284,8 +287,8 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         )
 
         // rewards will come through after a few blocks
-        const poolInfoAfterSettingUpRewards = await this.fundRaising.poolInfo(POOL_ZERO);
-        await time.advanceBlockTo(poolInfoAfterSettingUpRewards.lastRewardBlock.addn(4));
+        const poolIdToLastRewardBlock = await this.fundRaising.poolIdToLastRewardBlock(POOL_ZERO);
+        await time.advanceBlockTo(poolIdToLastRewardBlock.addn(4));
 
         // alice and bob claim their first few blocks of rewards
         await this.fundRaising.claimReward(POOL_ZERO, {from: alice})
@@ -309,6 +312,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
         await this.fundRaising.add(
           this.rewardToken2.address,
+          this.currentBlock.add(toBn('5')),
           this.stakingEndBlockProject2,
           this.pledgeFundingEndBlockProject2,
           this.project2TargetRaise,
@@ -347,16 +351,17 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         )
 
         // rewards will come through after a few blocks
-        const poolInfoAfterSettingUpRewards = await this.fundRaising.poolInfo(POOL_ONE);
-        await time.advanceBlockTo(poolInfoAfterSettingUpRewards.lastRewardBlock.addn(4));
+        const lastRewardBlockAfterSettingUpRewards = await this.fundRaising.poolIdToLastRewardBlock(POOL_ONE);
+        await time.advanceBlockTo(lastRewardBlockAfterSettingUpRewards.addn(4));
 
-        const totalRewardsForDanielAndEdAfter4Blocks = poolInfoAfterSettingUpRewards.rewardPerBlock.muln(4)
+        const rewardPerBlock = await this.fundRaising.poolIdToRewardPerBlock(POOL_ONE);
+        const totalRewardsForDanielAndEdAfter4Blocks = rewardPerBlock.muln(4)
         const totalRewardsDanielPreClaim = totalRewardsForDanielAndEdAfter4Blocks.divn(2)
 
         const pendingRewards = await this.fundRaising.pendingRewards(POOL_ONE, daniel)
         shouldBeNumberInEtherCloseTo(pendingRewards, fromWei(totalRewardsDanielPreClaim))
 
-        const totalRewardsForDanielAndEdAfter5Blocks = poolInfoAfterSettingUpRewards.rewardPerBlock.muln(5)
+        const totalRewardsForDanielAndEdAfter5Blocks = rewardPerBlock.muln(5)
         const totalRewardsDaniel = totalRewardsForDanielAndEdAfter5Blocks.divn(2)
 
         // 5 blocks of rewards should be available
@@ -374,9 +379,9 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.currentBlock = await time.latestBlock()
         const numBlocksSinceLastPoolZeroClaim = this.currentBlock.sub(this.lastClaimPoolZeroBlockNumber)
 
-        const poolZeroInfo = await this.fundRaising.poolInfo(POOL_ZERO)
+        const poolZeroRewardPerBlock = await this.fundRaising.poolIdToRewardPerBlock(POOL_ZERO)
 
-        const rewardsAvailableForAliceAndBobSinceLastClaim = poolZeroInfo.rewardPerBlock.mul(numBlocksSinceLastPoolZeroClaim)
+        const rewardsAvailableForAliceAndBobSinceLastClaim = poolZeroRewardPerBlock.mul(numBlocksSinceLastPoolZeroClaim)
 
         const totalRewardsAlice = rewardsAvailableForAliceAndBobSinceLastClaim.muln(2).divn(3) // alice gets 2/3 of rewards
 
@@ -388,7 +393,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         await this.fundRaising.massUpdatePools()
 
         const pendingRewardsAlice = await this.fundRaising.pendingRewards(POOL_ZERO, alice)
-        const expectedRewards = poolZeroInfo.rewardPerBlock.muln(2).divn(3) // alice gets 2/3 of rewards
+        const expectedRewards = poolZeroRewardPerBlock.muln(2).divn(3) // alice gets 2/3 of rewards
         shouldBeNumberInEtherCloseTo(pendingRewardsAlice, fromWei(expectedRewards))
       })
     })
@@ -401,7 +406,8 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           constants.ZERO_ADDRESS,
           0,
           1,
-          1,
+          2,
+          3,
           project1Admin,
           false
         ),
@@ -413,6 +419,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
       await expectRevert(
         this.fundRaising.add(
           this.launchPoolToken.address,
+          0,
           2,
           1,
           1,
@@ -427,6 +434,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
       await expectRevert(
         this.fundRaising.add(
           this.launchPoolToken.address,
+          0,
           1,
           2,
           0,
@@ -441,6 +449,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
       await expectRevert(
         this.fundRaising.add(
           this.launchPoolToken.address,
+          0,
           1,
           2,
           1,
@@ -475,6 +484,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
       await this.fundRaising.add(
         this.rewardToken1.address,
+        this.currentBlock.add(toBn('10')),
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
@@ -504,6 +514,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
       await this.fundRaising.add(
         this.rewardToken1.address,
+        this.currentBlock.add(toBn('10')),
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
@@ -545,6 +556,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
       await this.fundRaising.add(
         this.rewardToken1.address,
+        this.currentBlock.add(toBn('10')),
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
@@ -581,6 +593,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
       await this.fundRaising.add(
         this.rewardToken1.address,
+        this.currentBlock.add(toBn('10')),
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
@@ -610,6 +623,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
       await this.fundRaising.add(
         this.rewardToken1.address,
+        this.currentBlock.add(toBn('10')),
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
@@ -641,6 +655,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
       await this.fundRaising.add(
         this.rewardToken1.address,
+        this.currentBlock.add(toBn('10')),
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
@@ -686,6 +701,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
         await this.fundRaising.add(
           this.rewardToken1.address,
+          this.currentBlock.add(toBn('10')),
           this.stakingEndBlock,
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
@@ -741,6 +757,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
       await this.fundRaising.add(
         this.rewardToken1.address,
+        this.currentBlock.add(toBn('10')),
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
@@ -769,6 +786,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
       await this.fundRaising.add(
         this.rewardToken1.address,
+        this.currentBlock.add(toBn('10')),
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
@@ -828,6 +846,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
         await this.fundRaising.add(
           this.rewardToken1.address,
+          this.currentBlock.add(toBn('10')),
           this.stakingEndBlock,
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
@@ -912,6 +931,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
       await this.fundRaising.add(
         this.rewardToken1.address,
+        this.currentBlock.add(toBn('10')),
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
