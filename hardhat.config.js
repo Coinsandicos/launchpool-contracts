@@ -4,6 +4,7 @@ require("@nomiclabs/hardhat-truffle5");
 require('solidity-coverage');
 require('hardhat-gas-reporter');
 require('@nomiclabs/hardhat-solhint');
+require("@nomiclabs/hardhat-etherscan");
 
 const INFURA_PROJECT_ID = process.env.INFURA_PROJECT_ID;
 const PRIVATE_KEY = process.env.PRIVATE_KEY;
@@ -56,5 +57,8 @@ module.exports = {
     coverage: {
       url: 'http://localhost:8555',
     }
+  },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_KEY
   }
 };
