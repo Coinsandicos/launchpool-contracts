@@ -76,11 +76,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     // Total amount of funding received by stakers after stakingEndBlock and before pledgeFundingEndBlock
     mapping(uint256 => uint256) public poolIdToTotalRaised;
 
-    //totalStakeThatHasFundedPledge
-    // The stake that has funded their pledge which could be lower than total staked
-    // todo see if this is still needed with the additional acc per share variable
-    mapping(uint256 => uint256) public poolIdToTotalStakeThatHasFundedPledge;
-
     // True when funds have been claimed
     mapping(uint256 => bool) public poolIdToFundsClaimed;
 
@@ -183,7 +178,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         require(_amount > 0, "pledge: No pledge specified");
         require(block.number <= pool.stakingEndBlock, "pledge: Staking no longer permitted");
 
-        //todo call update pool to do percentage issuance
         updatePool(_pid);
 
         user.amount = user.amount.add(_amount);
@@ -193,20 +187,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
         emit Pledge(msg.sender, _pid, _amount);
     }
-
-    //todo drop this
-//    // pre-step 2 for staker
-//    function getPledgeFundingAmount(uint256 _pid) public view returns (uint256) {
-//        require(_pid < poolInfo.length, "getPledgeFundingAmount: Invalid PID");
-//        PoolInfo memory pool = poolInfo[_pid];
-//        UserInfo memory user = userInfo[_pid][msg.sender];
-//
-//        uint256 targetRaiseForPool = pool.targetRaise.mul(1e18);
-//        uint256 raisePerShare = targetRaiseForPool.div(poolIdToTotalStaked[_pid]);
-//
-//        // todo adjust based on acc percentage per share
-//        return user.amount.mul(raisePerShare).div(1e18);
-//    }
 
     function getPledgeFundingAmount(uint256 _pid) public view returns (uint256) {
         require(_pid < poolInfo.length, "getPledgeFundingAmount: Invalid PID");
@@ -232,8 +212,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
         poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(msg.value);
         user.pledgeFundingAmount = msg.value;
-
-        poolIdToTotalStakeThatHasFundedPledge[_pid] = poolIdToTotalStakeThatHasFundedPledge[_pid].add(user.amount);
 
         emit PledgeFunded(msg.sender, _pid, msg.value);
     }
@@ -284,10 +262,10 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
             uint256 maxEndBlock = block.number <= rewardEndBlock ? block.number : rewardEndBlock;
             uint256 multiplier = getMultiplier(lastRewardBlock, maxEndBlock);
             uint256 reward = multiplier.mul(rewardPerBlock);
-            accRewardPerShare = accRewardPerShare.add(reward.mul(1e18).div(poolIdToTotalStakeThatHasFundedPledge[_pid]));
+            accRewardPerShare = accRewardPerShare.add(reward.mul(1e18).div(TOTAL_TOKEN_ALLOCATION_POINTS));
         }
 
-        return user.amount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebt);
+        return user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebt);
     }
 
 
@@ -329,8 +307,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         uint256 rewardPerBlock = poolIdToRewardPerBlock[_pid];
         uint256 reward = multiplier.mul(rewardPerBlock);
 
-        uint256 totalStakeThatHasFundedPledge = poolIdToTotalStakeThatHasFundedPledge[_pid]; // todo this could be zero and could cause div by zero issues
-        poolIdToAccRewardPerShareVesting[_pid] = poolIdToAccRewardPerShareVesting[_pid].add(reward.mul(1e18).div(totalStakeThatHasFundedPledge));
+        poolIdToAccRewardPerShareVesting[_pid] = poolIdToAccRewardPerShareVesting[_pid].add(reward.mul(1e18).div(TOTAL_TOKEN_ALLOCATION_POINTS));
         poolIdToLastRewardBlock[_pid] = maxEndBlock;
     }
 
@@ -358,9 +335,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
         PoolInfo storage pool = poolInfo[_pid];
         uint256 accRewardPerShare = poolIdToAccRewardPerShareVesting[_pid];
-        uint256 pending = user.amount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebt);
+        uint256 pending = user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebt);
         if (pending > 0) {
-            user.rewardDebt = user.amount.mul(accRewardPerShare).div(1e18);
+            user.rewardDebt = user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18);
             safeRewardTransfer(pool.rewardToken, msg.sender, pending);
 
             emit RewardClaimed(msg.sender, _pid, pending);

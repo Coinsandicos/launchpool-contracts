@@ -67,7 +67,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
   const fundPledge = async (poolId, sender) => {
     const totalRaisedBefore = await this.fundRaising.poolIdToTotalRaised(poolId)
-    const totalStakeThatHasFundedPledgeBefore = await this.fundRaising.poolIdToTotalStakeThatHasFundedPledge(poolId)
     const contractEthBalance = await balance.tracker(this.fundRaising.address)
 
     const pledgeFundingAmount = await this.fundRaising.getPledgeFundingAmount(poolId, {from: sender})
@@ -83,9 +82,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     expect(fundingCommited).to.be.bignumber.equal(pledgeFundingAmount)
 
     const totalRaisedAfter = await this.fundRaising.poolIdToTotalRaised(poolId)
-    const totalStakeThatHasFundedPledgeAfter = await this.fundRaising.poolIdToTotalStakeThatHasFundedPledge(poolId)
     expect(totalRaisedAfter.sub(totalRaisedBefore)).to.be.bignumber.equal(pledgeFundingAmount)
-    expect(totalStakeThatHasFundedPledgeAfter.sub(totalStakeThatHasFundedPledgeBefore)).to.be.bignumber.equal(amount)
     expect(await contractEthBalance.delta()).to.be.bignumber.equal(pledgeFundingAmount)
   }
 
