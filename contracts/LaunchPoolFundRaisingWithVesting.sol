@@ -243,7 +243,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     function setupVestingRewards(uint256 _pid, uint256 _rewardAmount,  uint256 _rewardStartBlock, uint256 _rewardCliffEndBlock, uint256 _rewardEndBlock) external nonReentrant {
         require(_pid < poolInfo.length, "setupVestingRewards: Invalid PID");
         require(_rewardStartBlock > block.number, "setupVestingRewards: start block in the past");
-        //require(_rewardCliffEndBlock > _rewardStartBlock, "setupVestingRewards: Cliff must be after start block");
+        require(_rewardCliffEndBlock >= _rewardStartBlock, "setupVestingRewards: Cliff must be after or equal to start block");
         require(_rewardEndBlock > _rewardCliffEndBlock, "setupVestingRewards: end block must be after cliff block");
 
         PoolInfo storage pool = poolInfo[_pid];

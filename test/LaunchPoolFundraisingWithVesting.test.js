@@ -405,6 +405,170 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         shouldBeNumberInEtherCloseTo(pendingRewardsAlice, fromWei(expectedRewards))
       })
     })
+
+    describe('When multiple pools are set up with same reward token', () => {
+      beforeEach(async () => {
+        this.currentBlock = await time.latestBlock();
+
+        // create reward token for fund raising
+        this.rewardToken1 = await MockERC20.new(
+          'Reward1',
+          'Reward1',
+          ONE_HUNDRED_THOUSAND_TOKENS.muln(2),
+          {from: project1Admin}
+        )
+
+        // send project admin 2 100k tokens from token 1
+        await this.rewardToken1.transfer(project2Admin, ONE_HUNDRED_THOUSAND_TOKENS, {from: project1Admin})
+
+        this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+        this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+        this.project1TargetRaise = ether('100')
+
+        await this.fundRaising.add(
+          this.rewardToken1.address,
+          this.currentBlock.add(toBn('10')),
+          this.stakingEndBlock,
+          this.pledgeFundingEndBlock,
+          this.project1TargetRaise,
+          project1Admin,
+          TEN_MILLION_TOKENS,
+          false,
+          {from: deployer}
+        )
+
+        // let alice and bob pledge funding by staking LPOOL
+        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice) // Alice will have to fund 2/3 of the target raise
+        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS.divn(2), bob) // Bob will have to fund 1/3
+
+        // move past staking end
+        await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
+
+        // fund the pledge
+        await fundPledge(POOL_ZERO, alice)
+        await fundPledge(POOL_ZERO, bob)
+
+        // move past funding period
+        const _1BlockPastFundingEndBlock = this.pledgeFundingEndBlock.add(toBn('1'))
+        await time.advanceBlockTo(_1BlockPastFundingEndBlock);
+
+        // Project admin sends the rewards tokens in relation to raise
+        await setupVestingRewards(
+          POOL_ZERO,
+          this.rewardToken1,
+          ONE_HUNDRED_THOUSAND_TOKENS,
+          _1BlockPastFundingEndBlock.add(toBn('5')),
+          _1BlockPastFundingEndBlock.add(toBn('5')),
+          _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
+          project1Admin
+        )
+
+        // rewards will come through after a few blocks
+        const poolIdToLastRewardBlock = await this.fundRaising.poolIdToLastRewardBlock(POOL_ZERO);
+        await time.advanceBlockTo(poolIdToLastRewardBlock.addn(4));
+
+        // alice and bob claim their first few blocks of rewards
+        await this.fundRaising.claimReward(POOL_ZERO, {from: alice})
+
+        this.lastClaimPoolZeroBlockNumber = await time.latestBlock();
+
+        await this.fundRaising.claimReward(POOL_ZERO, {from: bob})
+
+        // use the same reward token for second project
+        this.currentBlock = await time.latestBlock();
+        this.stakingEndBlockProject2 = this.currentBlock.add(toBn('25'))
+        this.pledgeFundingEndBlockProject2 = this.stakingEndBlockProject2.add(toBn('10'))
+        this.project2TargetRaise = ether('100')
+
+        await this.fundRaising.add(
+          this.rewardToken1.address,
+          this.currentBlock.add(toBn('5')),
+          this.stakingEndBlockProject2,
+          this.pledgeFundingEndBlockProject2,
+          this.project2TargetRaise,
+          project2Admin,
+          TEN_MILLION_TOKENS,
+          true,
+          {from: deployer}
+        )
+
+        expect(await this.fundRaising.numberOfPools()).to.be.bignumber.equal('2')
+      })
+
+      it('Can fund the second project whilst users draw down from the first', async () => {
+        // let daniel and ed pledge funding by staking LPOOL
+        await pledge(POOL_ONE, ONE_THOUSAND_TOKENS.divn(2), daniel) // Daniel will have to fund 1/2 of the target raise
+        await pledge(POOL_ONE, ONE_THOUSAND_TOKENS.divn(2), ed) // Ed will have to fund 1/2
+
+        // move past staking end
+        await time.advanceBlockTo(this.stakingEndBlockProject2.add(toBn('1')))
+
+        // fund the pledge
+        await fundPledge(POOL_ONE, daniel)
+        await fundPledge(POOL_ONE, ed)
+
+        // move past funding period
+        const _1BlockPastFundingEndBlock = this.pledgeFundingEndBlockProject2.add(toBn('1'))
+        await time.advanceBlockTo(_1BlockPastFundingEndBlock);
+
+        // Project admin sends the rewards tokens in relation to raise
+        await setupVestingRewards(
+          POOL_ONE,
+          this.rewardToken1,
+          ONE_HUNDRED_THOUSAND_TOKENS,
+          _1BlockPastFundingEndBlock.add(toBn('5')),
+          _1BlockPastFundingEndBlock.add(toBn('5')),
+          _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
+          project2Admin
+        )
+
+        // rewards will come through after a few blocks
+        const lastRewardBlockAfterSettingUpRewards = await this.fundRaising.poolIdToLastRewardBlock(POOL_ONE);
+        await time.advanceBlockTo(lastRewardBlockAfterSettingUpRewards.addn(4));
+
+        const rewardPerBlock = await this.fundRaising.poolIdToRewardPerBlock(POOL_ONE);
+        const totalRewardsForDanielAndEdAfter4Blocks = rewardPerBlock.muln(4)
+        const totalRewardsDanielPreClaim = totalRewardsForDanielAndEdAfter4Blocks.divn(2)
+
+        const pendingRewards = await this.fundRaising.pendingRewards(POOL_ONE, daniel)
+        shouldBeNumberInEtherCloseTo(pendingRewards, fromWei(totalRewardsDanielPreClaim))
+
+        const totalRewardsForDanielAndEdAfter5Blocks = rewardPerBlock.muln(5)
+        const totalRewardsDaniel = totalRewardsForDanielAndEdAfter5Blocks.divn(2)
+
+        // 5 blocks of rewards should be available
+        await this.fundRaising.claimReward(POOL_ONE, {from: daniel})
+
+        const danielRewardTokenBalAfterClaim = await this.rewardToken1.balanceOf(daniel)
+
+        shouldBeNumberInEtherCloseTo(danielRewardTokenBalAfterClaim, fromWei(totalRewardsDaniel))
+
+        const aliceRewardTokenBalBeforeClaim = await this.rewardToken1.balanceOf(alice)
+
+        // Alice claims rewards from pool zero
+        await this.fundRaising.claimReward(POOL_ZERO, {from: alice})
+
+        this.currentBlock = await time.latestBlock()
+        const numBlocksSinceLastPoolZeroClaim = this.currentBlock.sub(this.lastClaimPoolZeroBlockNumber)
+
+        const poolZeroRewardPerBlock = await this.fundRaising.poolIdToRewardPerBlock(POOL_ZERO)
+
+        const rewardsAvailableForAliceAndBobSinceLastClaim = poolZeroRewardPerBlock.mul(numBlocksSinceLastPoolZeroClaim)
+
+        const totalRewardsAlice = rewardsAvailableForAliceAndBobSinceLastClaim.muln(2).divn(3) // alice gets 2/3 of rewards
+
+        const aliceRewardTokenBalAfterClaim = await this.rewardToken1.balanceOf(alice)
+
+        shouldBeNumberInEtherCloseTo(aliceRewardTokenBalAfterClaim.sub(aliceRewardTokenBalBeforeClaim), fromWei(totalRewardsAlice))
+
+        // update all the pools and there should be more rewards
+        await this.fundRaising.massUpdatePools()
+
+        const pendingRewardsAlice = await this.fundRaising.pendingRewards(POOL_ZERO, alice)
+        const expectedRewards = poolZeroRewardPerBlock.muln(2).divn(3) // alice gets 2/3 of rewards
+        shouldBeNumberInEtherCloseTo(pendingRewardsAlice, fromWei(expectedRewards))
+      })
+    })
   })
 
   describe.only('add()', () => {
@@ -823,6 +987,18 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         await expectRevert(
           this.fundRaising.setupVestingRewards(POOL_ZERO, ONE_THOUSAND_TOKENS, 0, 0, 0),
           "setupVestingRewards: start block in the past"
+        )
+      })
+
+      it('Reverts when cliff block is not at least eq start block', async () => {
+        this.currentBlock = await time.latestBlock();
+        const rewardStart = this.currentBlock.add(toBn('200'))
+        const rewardCliff = this.currentBlock.add(toBn('199'))
+        const rewardEnd = this.currentBlock.add(toBn('300'))
+
+        await expectRevert(
+          this.fundRaising.setupVestingRewards(POOL_ZERO, ONE_THOUSAND_TOKENS, rewardStart, rewardCliff, rewardEnd),
+          "setupVestingRewards: Cliff must be after or equal to start block"
         )
       })
 
