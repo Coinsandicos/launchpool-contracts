@@ -65,6 +65,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     // Block number when rewards start
     mapping(uint256 => uint256) public poolIdToRewardStartBlock;
 
+    // Block number when cliff ends
+    mapping(uint256 => uint256) public poolIdToRewardCliffEndBlock;
+
     // Block number when rewards end
     mapping(uint256 => uint256) public poolIdToRewardEndBlock;
 
@@ -237,7 +240,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     }
 
     // step 3
-    function setupVestingRewards(uint256 _pid, uint256 _rewardAmount,  uint256 _rewardStartBlock, uint256 _rewardEndBlock) external nonReentrant {
+    function setupVestingRewards(uint256 _pid, uint256 _rewardAmount,  uint256 _rewardStartBlock, uint256 _rewardCliffEndBlock, uint256 _rewardEndBlock) external nonReentrant {
         require(_pid < poolInfo.length, "setupVestingRewards: Invalid PID");
         require(_rewardEndBlock > block.number, "setupVestingRewards: end block in the past");
         require(_rewardStartBlock > block.number, "setupVestingRewards: start block in the past");
@@ -255,6 +258,8 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         poolIdToRewardStartBlock[_pid] = _rewardStartBlock;
         poolIdToLastRewardBlock[_pid] = _rewardStartBlock;
 
+        poolIdToRewardCliffEndBlock[_pid] = _rewardCliffEndBlock;
+
         poolIdToRewardEndBlock[_pid] = _rewardEndBlock;
 
         pool.rewardToken.transferFrom(msg.sender, address(rewardGuildBank), _rewardAmount);
@@ -269,6 +274,16 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
         // If they have staked but have not funded their pledge, they are not entitled to rewards
         if (user.pledgeFundingAmount == 0) {
+            return 0;
+        }
+
+        // not started yet
+        if (poolIdToRewardStartBlock[_pid] > block.number) {
+            return 0;
+        }
+
+        // cliff not served
+        if (poolIdToRewardCliffEndBlock[_pid] > block.number) {
             return 0;
         }
 
@@ -296,17 +311,21 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         require(_pid < poolInfo.length, "updatePool: invalid _pid");
 
         PoolInfo storage poolInfo = poolInfo[_pid];
+
+        // staking not started
         if (block.number < poolInfo.tokenAllocationStartBlock) {
             return;
         }
 
-        if(block.number <= poolInfo.stakingEndBlock) {
+        // staking not finished
+        if (block.number <= poolInfo.stakingEndBlock) {
             (uint256 accPercentPerShare, uint256 lastAllocBlock) = getAccPercentagePerShareAndLastAllocBlock(_pid);
             poolIdToAccPercentagePerShare[_pid] = accPercentPerShare;
             poolIdToLastPercentageAllocBlock[_pid] = lastAllocBlock;
         }
 
-        if (poolIdToRewardEndBlock[_pid] == 0) { // project has not sent rewards
+        // project has not sent rewards
+        if (poolIdToRewardEndBlock[_pid] == 0) {
             return;
         }
 
@@ -349,9 +368,14 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.pledgeFundingAmount > 0, "claimReward: Nice try pal");
 
+        require(poolIdToRewardStartBlock[_pid] > block.number, "claimReward: Not started");
+        require(poolIdToRewardCliffEndBlock[_pid] > block.number, "claimReward: Not past cliff");
+
         PoolInfo storage pool = poolInfo[_pid];
+
         uint256 accRewardPerShare = poolIdToAccRewardPerShareVesting[_pid];
         uint256 pending = user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebt);
+
         if (pending > 0) {
             user.rewardDebt = user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18);
             safeRewardTransfer(pool.rewardToken, msg.sender, pending);
