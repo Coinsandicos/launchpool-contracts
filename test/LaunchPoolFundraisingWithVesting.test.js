@@ -405,7 +405,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.skip('add()', () => {
+  describe.only('add()', () => {
     it('Reverts when reward token is zero address', async () => {
       await expectRevert(
         this.fundRaising.add(
@@ -691,10 +691,10 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.skip('setupVestingRewards()', () => {
+  describe.only('setupVestingRewards()', () => {
     it('Reverts when invalid PID', async () => {
       await expectRevert(
-        this.fundRaising.setupVestingRewards('999', '2', '3'),
+        this.fundRaising.setupVestingRewards('999', '2', '3', '4', '5'),
         "setupVestingRewards: Invalid PID"
       )
     })
@@ -728,38 +728,47 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         )
       })
 
-      it('Reverts when reward end block is in the past', async () => {
+      it('Reverts when reward end block before cliff end', async () => {
+        this.currentBlock = await time.latestBlock();
+        const rewardStart = this.currentBlock.add(toBn('200'))
+        const rewardCliff = this.currentBlock.add(toBn('250'))
+        const rewardEnd = this.currentBlock.add(toBn('210'))
+
         await expectRevert(
-          this.fundRaising.setupVestingRewards(POOL_ZERO, '2', '3'),
-          "setupVestingRewards: end block in the past"
+          this.fundRaising.setupVestingRewards(POOL_ZERO, '2', rewardStart, rewardCliff, rewardEnd),
+          "setupVestingRewards: end block must be after cliff block"
         )
       })
 
       it('Reverts when stakers are still pledging', async () => {
         this.currentBlock = await time.latestBlock();
+        const rewardStart = this.currentBlock.add(toBn('200'))
+        const rewardCliff = this.currentBlock.add(toBn('250'))
         const rewardEnd = this.currentBlock.add(toBn('500'))
 
         await expectRevert(
-          this.fundRaising.setupVestingRewards(POOL_ZERO, ONE_HUNDRED_THOUSAND_TOKENS, rewardEnd),
+          this.fundRaising.setupVestingRewards(POOL_ZERO, ONE_HUNDRED_THOUSAND_TOKENS, rewardStart, rewardCliff, rewardEnd),
           "setupVestingRewards: Stakers are still pledging"
         )
       })
 
       it('Reverts when not fund raising recipient', async () => {
         this.currentBlock = await time.latestBlock();
+        const rewardStart = this.currentBlock.add(toBn('200'))
+        const rewardCliff = this.currentBlock.add(toBn('250'))
         const rewardEnd = this.currentBlock.add(toBn('500'))
 
         await time.advanceBlockTo(this.pledgeFundingEndBlock.add(toBn('2')))
 
         await expectRevert(
-          this.fundRaising.setupVestingRewards(POOL_ZERO, ONE_HUNDRED_THOUSAND_TOKENS, rewardEnd, {from: daniel}),
+          this.fundRaising.setupVestingRewards(POOL_ZERO, ONE_HUNDRED_THOUSAND_TOKENS, rewardStart, rewardCliff, rewardEnd, {from: daniel}),
           "setupVestingRewards: Only fund raising recipient"
         )
       })
     })
   })
 
-  describe.skip('pendingRewards()', () => {
+  describe.only('pendingRewards()', () => {
     it('Returns zero when user has not funded a pledge', async () => {
       this.rewardToken1 = await MockERC20.new(
         'Reward1',
