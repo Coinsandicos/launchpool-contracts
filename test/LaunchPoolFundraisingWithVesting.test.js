@@ -150,7 +150,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     )
   })
 
-  describe.skip('Fund raising end to end flow', () => {
+  describe.only('Fund raising end to end flow', () => {
     describe('With 1 pool set up', () => {
       beforeEach(async () => {
         this.currentBlock = await time.latestBlock();
@@ -205,9 +205,9 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           POOL_ZERO,
           this.rewardToken1,
           ONE_HUNDRED_THOUSAND_TOKENS,
-          _1BlockPastFundingEndBlock,
-          _1BlockPastFundingEndBlock,
-          _1BlockPastFundingEndBlock.add(toBn('100')), // 1k tokens a block
+          _1BlockPastFundingEndBlock.add(toBn('5')),
+          _1BlockPastFundingEndBlock.add(toBn('5')),
+          _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
           project1Admin
         )
 
@@ -286,8 +286,9 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           POOL_ZERO,
           this.rewardToken1,
           ONE_HUNDRED_THOUSAND_TOKENS,
-          _1BlockPastFundingEndBlock.add(toBn('100')), // 1k tokens a block
-          this.pledgeFundingEndBlock,
+          _1BlockPastFundingEndBlock.add(toBn('5')),
+          _1BlockPastFundingEndBlock.add(toBn('5')),
+          _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
           project1Admin
         )
 
@@ -351,8 +352,9 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           POOL_ONE,
           this.rewardToken2,
           ONE_HUNDRED_THOUSAND_TOKENS,
-          _1BlockPastFundingEndBlock.add(toBn('100')), // 1k tokens a block
-          this.pledgeFundingEndBlockProject2,
+          _1BlockPastFundingEndBlock.add(toBn('5')),
+          _1BlockPastFundingEndBlock.add(toBn('5')),
+          _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
           project2Admin
         )
 
@@ -471,7 +473,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.skip('pledge()', () => {
+  describe.only('pledge()', () => {
     it('Reverts when invalid PID', async () => {
       await expectRevert(
         this.fundRaising.pledge('99', '1'),
@@ -545,7 +547,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.skip('fundPledge()', () => {
+  describe.only('fundPledge()', () => {
     it('Reverts when invalid PID', async () => {
       await expectRevert(
         this.fundRaising.fundPledge('99'),
@@ -798,7 +800,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.skip('claimReward()', () => {
+  describe.only('claimReward()', () => {
     beforeEach(async () => {
       this.rewardToken1 = await MockERC20.new(
         'Reward1',
