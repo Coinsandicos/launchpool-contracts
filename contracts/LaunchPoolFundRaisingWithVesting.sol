@@ -213,6 +213,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     // step 2
     function fundPledge(uint256 _pid) external payable nonReentrant {
         require(_pid < poolInfo.length, "fundPledge: Invalid PID");
+
+        updatePool(_pid);
+
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
 

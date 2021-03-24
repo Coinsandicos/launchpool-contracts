@@ -16,6 +16,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
                                                 carol,
                                                 daniel,
                                                 ed,
+                                                whale,
                                                 project1Admin,
                                                 project2Admin,
                                               ]) => {
@@ -45,6 +46,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     await this.launchPoolToken.transfer(carol, ONE_THOUSAND_TOKENS, {from});
     await this.launchPoolToken.transfer(daniel, ONE_THOUSAND_TOKENS, {from});
     await this.launchPoolToken.transfer(ed, ONE_THOUSAND_TOKENS, {from});
+    await this.launchPoolToken.transfer(whale, ONE_THOUSAND_TOKENS.muln(2), {from});
   };
 
   const pledge = async (poolId, amount, sender) => {
@@ -71,6 +73,8 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     const contractEthBalance = await balance.tracker(this.fundRaising.address)
 
     const pledgeFundingAmount = await this.fundRaising.getPledgeFundingAmount(poolId, {from: sender})
+    console.log('pledgeFundingAmount', pledgeFundingAmount.toString())
+
     const {receipt} = await this.fundRaising.fundPledge(poolId, {from: sender, value: pledgeFundingAmount})
 
     await expectEvent(receipt, 'PledgeFunded', {
@@ -737,6 +741,103 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
         const pendingRewardsAlice = await this.fundRaising.pendingRewards(POOL_ZERO, alice)
         shouldBeNumberInEtherCloseTo(pendingRewardsAlice, '0')
+      })
+    })
+
+    describe('When whale enters midway through and dilutes future earnings only (not past)', () => {
+      beforeEach(async () => {
+        this.currentBlock = await time.latestBlock();
+
+        // create reward token for fund raising
+        this.rewardToken1 = await MockERC20.new(
+          'Reward1',
+          'Reward1',
+          ONE_HUNDRED_THOUSAND_TOKENS,
+          {from: project1Admin}
+        )
+
+        this.stakingEndBlock = this.currentBlock.add(toBn('110'))
+        this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+        this.project1TargetRaise = ether('100')
+
+        const tokenAllocStartBlock = this.currentBlock.add(toBn('10'))
+        await this.fundRaising.add(
+          this.rewardToken1.address,
+          tokenAllocStartBlock,
+          this.stakingEndBlock,
+          this.pledgeFundingEndBlock,
+          this.project1TargetRaise,
+          project1Admin,
+          TEN_MILLION_TOKENS,
+          false,
+          {from: deployer}
+        )
+      })
+
+      it('Can farm reward tokens once all stages have passed', async () => {
+        // let alice and bob pledge funding by staking LPOOL
+        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice) // Alice will have to fund 1/2 of the target raise
+        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, bob) // Bob will have to fund 1/2
+
+        // move to midway through staking
+        await time.advanceBlockTo(this.stakingEndBlock.sub(toBn('49')))
+
+        // whale enters with 1.5k tokens - getting 50% of token alloc from this point on
+        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS.muln(2), whale)
+
+        // move past staking end
+        await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
+
+        // fund the pledge
+        await fundPledge(POOL_ZERO, alice)
+        await fundPledge(POOL_ZERO, bob)
+        await fundPledge(POOL_ZERO, whale)
+
+        // move past funding period
+        const _1BlockPastFundingEndBlock = this.pledgeFundingEndBlock.add(toBn('1'))
+        await time.advanceBlockTo(_1BlockPastFundingEndBlock);
+
+        // 100% funding will have taken place
+        const {raised, target} = await this.fundRaising.getTotalRaisedVsTarget(POOL_ZERO)
+        shouldBeNumberInEtherCloseTo(raised, fromWei(target))
+
+        // Project admin sends the rewards tokens in relation to raise
+        await setupVestingRewards(
+          POOL_ZERO,
+          this.rewardToken1,
+          ONE_HUNDRED_THOUSAND_TOKENS,
+          _1BlockPastFundingEndBlock.add(toBn('5')),
+          _1BlockPastFundingEndBlock.add(toBn('5')),
+          _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
+          project1Admin
+        )
+
+        // rewards will come through after a few blocks
+        const lastRewardBlockAfterSettingUpRewards = await this.fundRaising.poolIdToLastRewardBlock(POOL_ZERO);
+        await time.advanceBlockTo(lastRewardBlockAfterSettingUpRewards.addn(4));
+
+        // 5 blocks of rewards should be available
+        await this.fundRaising.claimReward(POOL_ZERO, {from: alice})
+
+        const poolIdToRewardPerBlock = await this.fundRaising.poolIdToRewardPerBlock(POOL_ZERO)
+        const totalRewardsForAliceAndBobAfter5Blocks = poolIdToRewardPerBlock.muln(5)
+        let singleUnitOfRewards = totalRewardsForAliceAndBobAfter5Blocks.divn(10000)
+        const totalRewardsAlice = singleUnitOfRewards.muln(3750) // alice gets 37.5% of the token allocation
+
+        const aliceRewardTokenBalAfterClaim = await this.rewardToken1.balanceOf(alice)
+
+        shouldBeNumberInEtherCloseTo(aliceRewardTokenBalAfterClaim, fromWei(totalRewardsAlice))
+
+        // bob claims after 6 blocks
+        const totalRewardsForAliceAndBobAfter6Blocks = poolIdToRewardPerBlock.muln(6)
+        singleUnitOfRewards = totalRewardsForAliceAndBobAfter6Blocks.divn(10000)
+        const totalRewardsBob = singleUnitOfRewards.muln(3750) // bob gets 37.5 too
+
+        await this.fundRaising.claimReward(POOL_ZERO, {from: bob})
+
+        const bobRewardTokenBalAfterClaim = await this.rewardToken1.balanceOf(bob)
+
+        shouldBeNumberInEtherCloseTo(bobRewardTokenBalAfterClaim, fromWei(totalRewardsBob))
       })
     })
   })
