@@ -471,6 +471,22 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         "add: _fundRaisingRecipient is zero address"
       )
     })
+
+    it('Reverts when token allocation block is after staking end', async () => {
+      await expectRevert(
+        this.fundRaising.add(
+          this.launchPoolToken.address,
+          4,
+          1,
+          2,
+          1,
+          constants.ZERO_ADDRESS,
+          TEN_MILLION_TOKENS,
+          false
+        ),
+        "add: _tokenAllocationStartBlock must be before staking end"
+      )
+    })
   })
 
   describe.only('pledge()', () => {
@@ -543,6 +559,46 @@ contract('LaunchPoolFundRaisingWithVesting', ([
       await expectRevert(
         this.fundRaising.pledge(POOL_ZERO, '1'),
         "pledge: Staking no longer permitted"
+      )
+    })
+
+    it('Reverts when trying to exceed the max staking per user', async () => {
+      // create reward token for fund raising
+      this.rewardToken1 = await MockERC20.new(
+        'Reward1',
+        'Reward1',
+        ONE_HUNDRED_THOUSAND_TOKENS,
+        {from: project1Admin}
+      )
+
+      this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+      this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+      this.project1TargetRaise = ether('100')
+
+      await this.fundRaising.add(
+        this.rewardToken1.address,
+        this.currentBlock.add(toBn('10')),
+        this.stakingEndBlock,
+        this.pledgeFundingEndBlock,
+        this.project1TargetRaise,
+        project1Admin,
+        TEN_MILLION_TOKENS,
+        false,
+        {from: deployer}
+      )
+
+      await expectRevert(
+        pledge(POOL_ZERO, TEN_MILLION_TOKENS.addn(1), alice),
+        "pledge: can not exceed max staking amount per user"
+      )
+    })
+  })
+
+  describe.only('getPledgeFundingAmount()', () => {
+    it('Reverts when pid is invalid', async () => {
+      await expectRevert(
+        this.fundRaising.getPledgeFundingAmount('9999'),
+        "getPledgeFundingAmount: Invalid PID"
       )
     })
   })
@@ -658,7 +714,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
 
     it('Reverts when invalid eth amount sent', async () => {
-// create reward token for fund raising
+      // create reward token for fund raising
       this.rewardToken1 = await MockERC20.new(
         'Reward1',
         'Reward1',
@@ -689,6 +745,39 @@ contract('LaunchPoolFundRaisingWithVesting', ([
       await expectRevert(
         this.fundRaising.fundPledge(POOL_ZERO, {from: alice, value: '5'}),
         "fundPledge: Required ETH amount not satisfied"
+      )
+    })
+
+    it('Reverts when user has not staked', async () => {
+      // create reward token for fund raising
+      this.rewardToken1 = await MockERC20.new(
+        'Reward1',
+        'Reward1',
+        ONE_HUNDRED_THOUSAND_TOKENS,
+        {from: project1Admin}
+      )
+
+      this.stakingEndBlock = this.currentBlock.add(toBn('100'))
+      this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+      this.project1TargetRaise = ether('100')
+
+      await this.fundRaising.add(
+        this.rewardToken1.address,
+        this.currentBlock.add(toBn('10')),
+        this.stakingEndBlock,
+        this.pledgeFundingEndBlock,
+        this.project1TargetRaise,
+        project1Admin,
+        TEN_MILLION_TOKENS,
+        false,
+        {from: deployer}
+      )
+
+      await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
+
+      await expectRevert(
+        this.fundRaising.fundPledge(POOL_ZERO, {from: alice, value: '5'}),
+        "fundPledge: Must have staked"
       )
     })
   })
@@ -833,6 +922,45 @@ contract('LaunchPoolFundRaisingWithVesting', ([
       )
     })
 
+    it('Reverts when not passed cliff', async () => {
+      await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice) // Alice will have to fund 2/3 of the target raise
+      await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS.divn(2), bob) // Bob will have to fund 1/3
+
+      // move past staking end
+      await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
+
+      // fund the pledge
+      await fundPledge(POOL_ZERO, alice)
+      await fundPledge(POOL_ZERO, bob)
+
+      // move past funding period
+      const _1BlockPastFundingEndBlock = this.pledgeFundingEndBlock.add(toBn('1'))
+      await time.advanceBlockTo(_1BlockPastFundingEndBlock);
+
+      // 100% funding will have taken place
+      const {raised, target} = await this.fundRaising.getTotalRaisedVsTarget(POOL_ZERO)
+      shouldBeNumberInEtherCloseTo(raised, fromWei(target))
+
+      // Project admin sends the rewards tokens in relation to raise
+      await setupVestingRewards(
+        POOL_ZERO,
+        this.rewardToken1,
+        ONE_HUNDRED_THOUSAND_TOKENS,
+        _1BlockPastFundingEndBlock.add(toBn('5')),
+        _1BlockPastFundingEndBlock.add(toBn('50')),
+        _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
+        project1Admin
+      )
+
+      await expectRevert(
+        this.fundRaising.claimReward(POOL_ZERO, {from: alice}),
+        "claimReward: Not past cliff"
+      )
+
+      // also pending rewards returns zero
+      expect(await this.fundRaising.pendingRewards(POOL_ZERO, alice)).to.be.bignumber.equal('0')
+    })
+
     it('When rewards have not been set up, no rewards issued', async () => {
       await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice)
 
@@ -943,6 +1071,13 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         )
       })
     })
+
+    it('Reverts when pid is invalid', async () => {
+      await expectRevert(
+        this.fundRaising.claimFundRaising('999'),
+        "claimFundRaising: invalid _pid"
+      )
+    })
   })
 
   describe.only('withdraw', () => {
@@ -1038,6 +1173,13 @@ contract('LaunchPoolFundRaisingWithVesting', ([
       await expectRevert(
         this.fundRaising.withdraw(POOL_ZERO, {from: daniel}),
         "withdraw: No stake to withdraw"
+      )
+    })
+
+    it('Reverts when pid is invalid', async () => {
+      await expectRevert(
+        this.fundRaising.withdraw('999'),
+        "withdraw: invalid _pid"
       )
     })
   })
