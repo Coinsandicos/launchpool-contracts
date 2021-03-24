@@ -22,7 +22,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     struct UserInfo {
         uint256 amount;     // How many tokens are staked in a pool
         uint256 pledgeFundingAmount; // Based on staked tokens, the funding that has come from the user (or not if they choose to pull out)
-        bool stakeWithdrawn; // Set to true if the staked amount is withdrawn after the deposit deadline. No more withdrawals permitted!!
         uint256 rewardDebt; // Reward debt. See explanation below.
         //
         // We do some fancy math here. Basically, once vesting has started in a pool (if they have deposited), the amount of reward tokens
@@ -41,6 +40,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         uint256 pledgeFundingEndBlock; // Between stakingEndBlock and this number pledge funding is permitted
         uint256 targetRaise; // Amount that the project wishes to raise
         address payable fundRaisingRecipient; // The account that can claim the funds raised
+        uint256 maxStakingAmountPerUser; // Max. amount of tokens that can be staked per account/user
     }
 
     /// @notice staking token is fixed for all pools
@@ -52,6 +52,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     /// @notice List of pools that users can stake into
     PoolInfo[] public poolInfo;
 
+    // Pool to accumulated share counters
     mapping(uint256 => uint256) public poolIdToAccPercentagePerShare;
     mapping(uint256 => uint256) public poolIdToLastPercentageAllocBlock;
 
@@ -60,6 +61,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
     // Last block number that reward token distribution took place
     mapping(uint256 => uint256) public poolIdToLastRewardBlock;
+
+    // Block number when rewards start
+    mapping(uint256 => uint256) public poolIdToRewardStartBlock;
 
     // Block number when rewards end
     mapping(uint256 => uint256) public poolIdToRewardEndBlock;
@@ -119,6 +123,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         uint256 _pledgeFundingEndBlock,
         uint256 _targetRaise,
         address payable _fundRaisingRecipient,
+        uint256 _maxStakingAmountPerUser,
         bool _withUpdate
     ) public onlyOwner {
         address rewardTokenAddress = address(_rewardToken);
@@ -138,7 +143,8 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
             stakingEndBlock: _stakingEndBlock,
             pledgeFundingEndBlock: _pledgeFundingEndBlock,
             targetRaise: _targetRaise,
-            fundRaisingRecipient: _fundRaisingRecipient
+            fundRaisingRecipient: _fundRaisingRecipient,
+            maxStakingAmountPerUser: _maxStakingAmountPerUser
         }));
 
         poolIdToLastPercentageAllocBlock[poolInfo.length.sub(1)] = _tokenAllocationStartBlock;
@@ -178,6 +184,8 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         require(_amount > 0, "pledge: No pledge specified");
         require(block.number <= pool.stakingEndBlock, "pledge: Staking no longer permitted");
 
+        require(user.amount.add(_amount) <= pool.maxStakingAmountPerUser, "pledge: can not exceed max staking amount per user");
+
         updatePool(_pid);
 
         user.amount = user.amount.add(_amount);
@@ -206,12 +214,19 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         UserInfo storage user = userInfo[_pid][msg.sender];
 
         require(user.pledgeFundingAmount == 0, "fundPledge: Pledge has already been funded");
+
         require(block.number > pool.stakingEndBlock, "fundPledge: Staking is still taking place");
         require(block.number <= pool.pledgeFundingEndBlock, "fundPledge: Deadline has passed to fund your pledge");
+
+        require(user.amount > 0, "fundPledge: Must have staked");
+
+        require(getPledgeFundingAmount(_pid) > 0, "fundPledge: must have positive pledge amount");
         require(msg.value == getPledgeFundingAmount(_pid), "fundPledge: Required ETH amount not satisfied");
 
         poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(msg.value);
-        user.pledgeFundingAmount = msg.value;
+        user.pledgeFundingAmount = msg.value; // ensures pledges can only be done once
+
+        stakingToken.safeTransfer(address(msg.sender), user.amount);
 
         emit PledgeFunded(msg.sender, _pid, msg.value);
     }
@@ -222,21 +237,24 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     }
 
     // step 3
-    function setupVestingRewards(uint256 _pid, uint256 _rewardAmount, uint256 _rewardEndBlock) external nonReentrant {
+    function setupVestingRewards(uint256 _pid, uint256 _rewardAmount,  uint256 _rewardStartBlock, uint256 _rewardEndBlock) external nonReentrant {
         require(_pid < poolInfo.length, "setupVestingRewards: Invalid PID");
         require(_rewardEndBlock > block.number, "setupVestingRewards: end block in the past");
+        require(_rewardStartBlock > block.number, "setupVestingRewards: start block in the past");
 
         PoolInfo storage pool = poolInfo[_pid];
 
         require(block.number > pool.pledgeFundingEndBlock, "setupVestingRewards: Stakers are still pledging");
         require(msg.sender == pool.fundRaisingRecipient, "setupVestingRewards: Only fund raising recipient");
 
-        uint256 currentBlockNumber = block.number;
-        uint256 vestingLength = _rewardEndBlock.sub(currentBlockNumber);
+        uint256 vestingLength = _rewardEndBlock.sub(_rewardStartBlock);
 
         poolIdToMaxRewardTokensAvailableForVesting[_pid] = _rewardAmount;
         poolIdToRewardPerBlock[_pid] = _rewardAmount.div(vestingLength);
-        poolIdToLastRewardBlock[_pid] = currentBlockNumber;
+
+        poolIdToRewardStartBlock[_pid] = _rewardStartBlock;
+        poolIdToLastRewardBlock[_pid] = _rewardStartBlock;
+
         poolIdToRewardEndBlock[_pid] = _rewardEndBlock;
 
         pool.rewardToken.transferFrom(msg.sender, address(rewardGuildBank), _rewardAmount);
@@ -268,13 +286,11 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         return user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebt);
     }
 
-
     function massUpdatePools() public {
         for (uint256 pid = 0; pid < poolInfo.length; pid++) {
             updatePool(pid);
         }
     }
-
 
     function updatePool(uint256 _pid) public {
         require(_pid < poolInfo.length, "updatePool: invalid _pid");
@@ -344,7 +360,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         }
     }
 
-    // withdraw only permitted post `pledgeFundingEndBlock` and you can only take out full amount regardless of whether you have funded your pledge
+    // withdraw only permitted post `pledgeFundingEndBlock` and you can only take out full amount if you did not fund the pledge
     // functions like the old emergency withdraw as it does not concern itself with claiming rewards
     function withdraw(uint256 _pid) external nonReentrant {
         require(_pid < poolInfo.length, "withdraw: invalid _pid");
@@ -352,13 +368,14 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
 
-        require(user.amount > 0, "withdraw: Nothing to see here");
-        require(user.stakeWithdrawn == false, "withdraw: Stake already withdrawn");
+        require(user.amount > 0, "withdraw: No stake to withdraw");
+        require(user.pledgeFundingAmount == 0, "withdraw: Only allow non-funders to withdraw");
         require(block.number > pool.pledgeFundingEndBlock, "withdraw: Not yet permitted");
 
-        user.stakeWithdrawn = true;
-
         stakingToken.safeTransfer(address(msg.sender), user.amount);
+
+        // all sent
+        user.amount = 0;
 
         emit Withdraw(msg.sender, _pid, user.amount);
     }

@@ -31,6 +31,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     return toBn(gasUsed).mul(toBn(8000000000))
   }
 
+  const ZERO = to18DP('0');
   const TEN_TOKENS = to18DP('10');
   const ONE_THOUSAND_TOKENS = to18DP('1000');
   const TEN_THOUSAND_TOKENS = ONE_THOUSAND_TOKENS.muln(10);
@@ -171,6 +172,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
           project1Admin,
+          TEN_MILLION_TOKENS,
           false,
           {from: deployer}
         )
@@ -256,6 +258,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
           project1Admin,
+          TEN_MILLION_TOKENS,
           false,
           {from: deployer}
         )
@@ -316,6 +319,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.pledgeFundingEndBlockProject2,
           this.project2TargetRaise,
           project2Admin,
+          TEN_MILLION_TOKENS,
           true,
           {from: deployer}
         )
@@ -408,6 +412,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           2,
           3,
           project1Admin,
+          TEN_MILLION_TOKENS,
           false
         ),
         "add: _rewardToken is zero address"
@@ -423,6 +428,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           1,
           1,
           project1Admin,
+          TEN_MILLION_TOKENS,
           false
         ),
         "add: staking end must be before funding end"
@@ -438,6 +444,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           2,
           0,
           project1Admin,
+          TEN_MILLION_TOKENS,
           false
         ),
         "add: Invalid raise amount"
@@ -453,6 +460,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           2,
           1,
           constants.ZERO_ADDRESS,
+          TEN_MILLION_TOKENS,
           false
         ),
         "add: _fundRaisingRecipient is zero address"
@@ -488,6 +496,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
         project1Admin,
+        TEN_MILLION_TOKENS,
         false,
         {from: deployer}
       )
@@ -518,6 +527,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
         project1Admin,
+        TEN_MILLION_TOKENS,
         false,
         {from: deployer}
       )
@@ -560,6 +570,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
         project1Admin,
+        TEN_MILLION_TOKENS,
         false,
         {from: deployer}
       )
@@ -597,6 +608,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
         project1Admin,
+        TEN_MILLION_TOKENS,
         false,
         {from: deployer}
       )
@@ -627,6 +639,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
         project1Admin,
+        TEN_MILLION_TOKENS,
         false,
         {from: deployer}
       )
@@ -659,6 +672,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
         project1Admin,
+        TEN_MILLION_TOKENS,
         false,
         {from: deployer}
       )
@@ -705,6 +719,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
           project1Admin,
+          TEN_MILLION_TOKENS,
           false,
           {from: deployer}
         )
@@ -761,6 +776,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
         project1Admin,
+        TEN_MILLION_TOKENS,
         false,
         {from: deployer}
       )
@@ -790,6 +806,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
         project1Admin,
+        TEN_MILLION_TOKENS,
         false,
         {from: deployer}
       )
@@ -850,6 +867,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
           project1Admin,
+          TEN_MILLION_TOKENS,
           false,
           {from: deployer}
         )
@@ -935,6 +953,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
         project1Admin,
+        TEN_MILLION_TOKENS,
         false,
         {from: deployer}
       )
@@ -943,7 +962,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
       await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice)
     })
 
-    it('Can withdraw if funded pledge after pledgeFundingEndBlock', async () => {
+    it('Can not withdraw if funded pledge after pledgeFundingEndBlock', async () => {
       await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
 
       // fund the pledge
@@ -955,11 +974,10 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
       const aliceLpoolBalBefore = await this.launchPoolToken.balanceOf(alice)
 
-      await this.fundRaising.withdraw(POOL_ZERO, {from: alice})
-
-      const aliceLpoolBalAfter = await this.launchPoolToken.balanceOf(alice)
-
-      expect(aliceLpoolBalAfter.sub(aliceLpoolBalBefore)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS)
+      await expectRevert(
+        this.fundRaising.withdraw(POOL_ZERO, {from: alice}),
+        "withdraw: Only allow non-funders to withdraw"
+      );
     })
 
     it('Can withdraw if not funded pledge after pledgeFundingEndBlock', async () => {
@@ -999,14 +1017,14 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
       await expectRevert(
         this.fundRaising.withdraw(POOL_ZERO, {from: alice}),
-        "withdraw: Stake already withdrawn"
+        "withdraw: No stake to withdraw"
       )
     })
 
     it('Reverts when user has not staked', async () => {
       await expectRevert(
         this.fundRaising.withdraw(POOL_ZERO, {from: daniel}),
-        "withdraw: Nothing to see here"
+        "withdraw: No stake to withdraw"
       )
     })
   })
