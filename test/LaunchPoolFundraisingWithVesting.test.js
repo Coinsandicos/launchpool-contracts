@@ -819,6 +819,13 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         )
       })
 
+      it('Reverts when start block is in the past', async () => {
+        await expectRevert(
+          this.fundRaising.setupVestingRewards(POOL_ZERO, ONE_THOUSAND_TOKENS, 0, 0, 0),
+          "setupVestingRewards: start block in the past"
+        )
+      })
+
       it('Reverts when reward end block before cliff end', async () => {
         this.currentBlock = await time.latestBlock();
         const rewardStart = this.currentBlock.add(toBn('200'))
