@@ -242,8 +242,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     // step 3
     function setupVestingRewards(uint256 _pid, uint256 _rewardAmount,  uint256 _rewardStartBlock, uint256 _rewardCliffEndBlock, uint256 _rewardEndBlock) external nonReentrant {
         require(_pid < poolInfo.length, "setupVestingRewards: Invalid PID");
-        require(_rewardEndBlock > block.number, "setupVestingRewards: end block in the past");
         require(_rewardStartBlock > block.number, "setupVestingRewards: start block in the past");
+        require(_rewardCliffEndBlock > _rewardStartBlock, "setupVestingRewards: Cliff must be after start block");
+        require(_rewardEndBlock > _rewardCliffEndBlock, "setupVestingRewards: end block must be after cliff block");
 
         PoolInfo storage pool = poolInfo[_pid];
 
@@ -274,11 +275,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
         // If they have staked but have not funded their pledge, they are not entitled to rewards
         if (user.pledgeFundingAmount == 0) {
-            return 0;
-        }
-
-        // not started yet
-        if (poolIdToRewardStartBlock[_pid] > block.number) {
             return 0;
         }
 
@@ -329,6 +325,11 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
             return;
         }
 
+        // cliff has not passed for pool
+        if (block.number < poolIdToRewardCliffEndBlock[_pid]) {
+            return;
+        }
+
         uint256 rewardEndBlock = poolIdToRewardEndBlock[_pid];
         uint256 lastRewardBlock = poolIdToLastRewardBlock[_pid];
         uint256 maxEndBlock = block.number <= rewardEndBlock ? block.number : rewardEndBlock;
@@ -365,11 +366,10 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     function claimReward(uint256 _pid) public nonReentrant {
         updatePool(_pid);
 
+        require(block.number >= poolIdToRewardCliffEndBlock[_pid], "claimReward: Not past cliff");
+
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.pledgeFundingAmount > 0, "claimReward: Nice try pal");
-
-        require(poolIdToRewardStartBlock[_pid] > block.number, "claimReward: Not started");
-        require(poolIdToRewardCliffEndBlock[_pid] > block.number, "claimReward: Not past cliff");
 
         PoolInfo storage pool = poolInfo[_pid];
 
@@ -396,7 +396,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         require(user.pledgeFundingAmount == 0, "withdraw: Only allow non-funders to withdraw");
         require(block.number > pool.pledgeFundingEndBlock, "withdraw: Not yet permitted");
 
-        stakingToken.safeTransfer(address(msg.sender), user.amount);
+        stakingToken.safeTransfer(msg.sender, user.amount);
 
         // all sent
         user.amount = 0;
