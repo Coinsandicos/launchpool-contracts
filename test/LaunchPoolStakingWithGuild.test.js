@@ -25,7 +25,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
       await this.staking.updatePool(pool, {from});
     }
     assert.equal((await this.launchPoolToken.balanceOf(from)).toString(), to18DP(lptUserBalance).toString());
-    assert.equal((await this.staking.pendingLpt(pool, from)).toString(), to18DP(lptPendingBalance).toString());
+    assert.equal((await this.staking.pendingRewards(pool, from)).toString(), to18DP(lptPendingBalance).toString());
   };
 
   const TEN_TOKENS = to18DP('10');
@@ -54,7 +54,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
     await this.launchPoolToken.transfer(guildBankAddress, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
 
     // Confirm reward per block
-    assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
+    assert.equal((await this.staking.rewardPerBlock()).toString(), to18DP('10'));
 
     expect(await this.launchPoolToken.balanceOf(guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
 
@@ -114,7 +114,27 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
       await checkRewards(POOL_ZERO, bob, '1000', '0', false);
     });
 
-    it.only('usecase testing', async () => {
+    it('Can stake, unstake and restake', async () => {
+      // Deposit liquidity into pool
+      await this.launchPoolToken.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
+      await this.staking.deposit(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+
+      expect(await this.launchPoolToken.balanceOf(this.staking.address)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
+      expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
+
+      await this.staking.withdraw(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+
+      await this.launchPoolToken.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
+      await this.staking.deposit(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+
+      await this.staking.withdraw(POOL_ZERO, ONE_THOUSAND_TOKENS.divn(2), {from: bob});
+      await this.staking.withdraw(POOL_ZERO, ONE_THOUSAND_TOKENS.divn(2), {from: bob});
+
+      await this.launchPoolToken.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});
+      await this.staking.deposit(POOL_ZERO, ONE_THOUSAND_TOKENS, {from: bob});
+    })
+
+    it.skip('usecase testing', async () => {
       expect(await this.launchPoolToken.balanceOf(this.guildBankAddress)).to.be.bignumber.equal(ONE_THOUSAND_TOKENS);
 
       // Deposit liquidity into pool
@@ -301,7 +321,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
       await this.launchPoolToken.transfer(guildBankAddress, ONE_THOUSAND_TOKENS, {from: launchPoolAdmin});
 
       // Confirm reward per block
-      assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
+      assert.equal((await this.staking.rewardPerBlock()).toString(), to18DP('10'));
 
       await setupUsers(this.launchPoolToken, launchPoolAdmin);
     });
@@ -412,7 +432,7 @@ contract('LaunchPoolStakingWithGuild', ([adminAlice, bob, carol, daniel, minter,
       await this.staking.add('100', this.launchPoolToken.address, ONE_THOUSAND_TOKENS, true, {from: adminAlice});
 
       // Confirm reward per block
-      assert.equal((await this.staking.lptPerBlock()).toString(), to18DP('10'));
+      assert.equal((await this.staking.rewardPerBlock()).toString(), to18DP('10'));
 
       // Deposit liquidity into pool
       await this.launchPoolToken.approve(this.staking.address, ONE_THOUSAND_TOKENS, {from: bob});

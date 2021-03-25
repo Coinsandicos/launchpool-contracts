@@ -8,10 +8,9 @@ import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-import { LaunchPoolToken } from "./LaunchPoolToken.sol";
 import { Guild } from "./Guild.sol";
 
-/// @title Staking contract for farming LPT rewards in return for staking a whitelisted token(s)
+/// @title Staking contract for farming generic rewards in return for staking a whitelisted token(s)
 /// @author BlockRocket.tech
 /// @notice Fork of MasterChef.sol from SushiSwap
 /// @dev Only the owner can add new pools
@@ -24,13 +23,13 @@ contract LaunchPoolStakingWithGuild is Ownable {
         uint256 amount;     // How many tokens the user has provided to a pool
         uint256 rewardDebt; // Reward debt. See explanation below.
         //
-        // We do some fancy math here. Basically, any point in time, the amount of LPTs
+        // We do some fancy math here. Basically, any point in time, the amount of reward tokens
         // entitled to a user but is pending to be distributed is:
         //
-        //   pending reward = (user.amount * pool.accLptPerShare) - user.rewardDebt
+        //   pending reward = (user.amount * pool.accRewardPerShare) - user.rewardDebt
         //
         // Whenever a user deposits or withdraws ERC20 tokens to a pool. Here's what happens:
-        //   1. The pool's `accLptPerShare` (and `lastRewardBlock`) gets updated.
+        //   1. The pool's `accRewardPerShare` (and `lastRewardBlock`) gets updated.
         //   2. User receives the pending reward sent to his/her address.
         //   3. User's `amount` gets updated.
         //   4. User's `rewardDebt` gets updated.
@@ -40,19 +39,19 @@ contract LaunchPoolStakingWithGuild is Ownable {
     struct PoolInfo {
         IERC20 erc20Token; // Address of token contract.
         uint256 allocPoint; // How many allocation points assigned to this pool; this is a weighting for rewards.
-        uint256 lastRewardBlock; // Last block number that LPT distribution has occurred up to endBlock.
-        uint256 accLptPerShare; // Per LP token staked, how much LPT earned in pool that users will get
+        uint256 lastRewardBlock; // Last block number that reward token distribution has occurred up to endBlock.
+        uint256 accRewardPerShare; // Per LP token staked, how much reward token earned in pool that users will get
         uint256 maxStakingAmountPerUser; // Max. amount of tokens that can be staked per account/user
     }
 
     /// @notice Container for holding all rewards
     Guild public rewardGuildBank;
 
-    /// @notice Number of LPT tokens distributed per block, across all pools.
-    uint256 public lptPerBlock;
+    /// @notice Number of reward tokens distributed per block, across all pools.
+    uint256 public rewardPerBlock;
 
     /// @notice The total amount of reward token available for farming across all pools between start and end block.
-    uint256 public maxLPTAvailableForFarming;
+    uint256 public maxRewardTokenAvailableForFarming;
 
     /// @notice List of pools that users can stake into
     PoolInfo[] public poolInfo;
@@ -64,7 +63,7 @@ contract LaunchPoolStakingWithGuild is Ownable {
     /// @notice Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint;
 
-    /// @notice The block number when LPT rewards starts across all pools.
+    /// @notice The block number when rewards starts across all pools.
     uint256 public startBlock;
 
     /// @notice The block number when rewards ends.
@@ -77,27 +76,27 @@ contract LaunchPoolStakingWithGuild is Ownable {
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
 
-    /// @param _lpt Address of the LPT reward token
-    /// @param _maxLPTAvailableForFarming Maximum number of LPT that will be distributed between the start and end of farming
+    /// @param _rewardToken Address of the reward token
+    /// @param _maxRewardTokenAvailableForFarming Maximum number of reward token that will be distributed between the start and end of farming
     /// @param _startBlock Block number when farming will begin for all pools
     /// @param _endBlock Block number when farming will end for all pools
     constructor(
-        LaunchPoolToken _lpt,
-        uint256 _maxLPTAvailableForFarming,
+        IERC20 _rewardToken,
+        uint256 _maxRewardTokenAvailableForFarming,
         uint256 _startBlock,
         uint256 _endBlock
     ) public {
-        require(address(_lpt) != address(0), "constructor: _lpt must not be zero address");
-        require(_maxLPTAvailableForFarming > 0, "constructor: _maxLPTAvailableForFarming must be greater than zero");
+        require(address(_rewardToken) != address(0), "constructor: _rewardToken must not be zero address");
+        require(_maxRewardTokenAvailableForFarming > 0, "constructor: _maxRewardTokenAvailableForFarming must be greater than zero");
 
-        maxLPTAvailableForFarming = _maxLPTAvailableForFarming;
+        maxRewardTokenAvailableForFarming = _maxRewardTokenAvailableForFarming;
         startBlock = _startBlock;
         endBlock = _endBlock;
 
         uint256 numberOfBlocksForFarming = endBlock.sub(startBlock);
-        lptPerBlock = maxLPTAvailableForFarming.div(numberOfBlocksForFarming);
+        rewardPerBlock = maxRewardTokenAvailableForFarming.div(numberOfBlocksForFarming);
 
-        rewardGuildBank = new Guild(IERC20(address(_lpt)), address(this));
+        rewardGuildBank = new Guild(IERC20(address(_rewardToken)), address(this));
     }
 
     /// @notice Returns the number of pools that have been added by the owner
@@ -106,9 +105,9 @@ contract LaunchPoolStakingWithGuild is Ownable {
         return poolInfo.length;
     }
 
-    /// @notice Create a new LPT pool by whitelisting a new ERC20 token.
+    /// @notice Create a new reward pool by whitelisting a new ERC20 token.
     /// @dev Can only be called by the contract owner
-    /// @param _allocPoint Governs what percentage of the total LPT rewards this pool and other pools will get
+    /// @param _allocPoint Governs what percentage of the total rewards this pool and other pools will get
     /// @param _erc20Token Address of the staking token being whitelisted
     /// @param _maxStakingAmountPerUser For this pool, maximum amount per user that can be staked
     /// @param _withUpdate Set to true for updating all pools before adding this one
@@ -129,7 +128,7 @@ contract LaunchPoolStakingWithGuild is Ownable {
             erc20Token : _erc20Token,
             allocPoint : _allocPoint,
             lastRewardBlock : lastRewardBlock,
-            accLptPerShare : 0,
+            accRewardPerShare : 0,
             maxStakingAmountPerUser: _maxStakingAmountPerUser
         }));
 
@@ -158,27 +157,27 @@ contract LaunchPoolStakingWithGuild is Ownable {
         poolInfo[_pid].maxStakingAmountPerUser = _maxStakingAmountPerUser;
     }
 
-    /// @notice View function to see pending and unclaimed LPTs for a given user
+    /// @notice View function to see pending and unclaimed reward tokens for a given user
     /// @param _pid ID of the pool where a user has a stake
     /// @param _user Account being queried
-    /// @return Amount of LPT tokens due to a user
-    function pendingLpt(uint256 _pid, address _user) external view returns (uint256) {
-        require(_pid < poolInfo.length, "pendingLpt: invalid _pid");
+    /// @return Amount of reward tokens due to a user
+    function pendingRewards(uint256 _pid, address _user) external view returns (uint256) {
+        require(_pid < poolInfo.length, "pendingRewards: invalid _pid");
 
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
 
-        uint256 accLptPerShare = pool.accLptPerShare;
+        uint256 accRewardPerShare = pool.accRewardPerShare;
         uint256 lpSupply = pool.erc20Token.balanceOf(address(this));
 
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
             uint256 maxEndBlock = block.number <= endBlock ? block.number : endBlock;
             uint256 multiplier = getMultiplier(pool.lastRewardBlock, maxEndBlock);
-            uint256 lptReward = multiplier.mul(lptPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
-            accLptPerShare = accLptPerShare.add(lptReward.mul(1e18).div(lpSupply));
+            uint256 reward = multiplier.mul(rewardPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+            accRewardPerShare = accRewardPerShare.add(reward.mul(1e18).div(lpSupply));
         }
 
-        return user.amount.mul(accLptPerShare).div(1e18).sub(user.rewardDebt);
+        return user.amount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebt);
     }
 
     /// @notice Cycles through the pools to update all of the rewards accrued
@@ -213,13 +212,13 @@ contract LaunchPoolStakingWithGuild is Ownable {
             return;
         }
 
-        uint256 lptReward = multiplier.mul(lptPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
+        uint256 reward = multiplier.mul(rewardPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
 
-        pool.accLptPerShare = pool.accLptPerShare.add(lptReward.mul(1e18).div(erc20Supply));
+        pool.accRewardPerShare = pool.accRewardPerShare.add(reward.mul(1e18).div(erc20Supply));
         pool.lastRewardBlock = maxEndBlock;
     }
 
-    /// @notice Where any user can stake their ERC20 tokens into a pool in order to farm $LPT
+    /// @notice Where any user can stake their ERC20 tokens into a pool in order to farm rewards
     /// @param _pid ID of the pool
     /// @param _amount Amount of ERC20 being staked
     function deposit(uint256 _pid, uint256 _amount) external {
@@ -231,9 +230,9 @@ contract LaunchPoolStakingWithGuild is Ownable {
         updatePool(_pid);
 
         if (user.amount > 0) {
-            uint256 pending = user.amount.mul(pool.accLptPerShare).div(1e18).sub(user.rewardDebt);
+            uint256 pending = user.amount.mul(pool.accRewardPerShare).div(1e18).sub(user.rewardDebt);
             if (pending > 0) {
-                safeLptTransfer(msg.sender, pending);
+                safeRewardTransfer(msg.sender, pending);
             }
         }
 
@@ -242,7 +241,7 @@ contract LaunchPoolStakingWithGuild is Ownable {
             user.amount = user.amount.add(_amount);
         }
 
-        user.rewardDebt = user.amount.mul(pool.accLptPerShare).div(1e18);
+        user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
@@ -258,9 +257,9 @@ contract LaunchPoolStakingWithGuild is Ownable {
 
         updatePool(_pid);
 
-        uint256 pending = user.amount.mul(pool.accLptPerShare).div(1e18).sub(user.rewardDebt);
+        uint256 pending = user.amount.mul(pool.accRewardPerShare).div(1e18).sub(user.rewardDebt);
         if (pending > 0) {
-            safeLptTransfer(msg.sender, pending);
+            safeRewardTransfer(msg.sender, pending);
         }
 
         if (_amount > 0) {
@@ -268,7 +267,7 @@ contract LaunchPoolStakingWithGuild is Ownable {
             pool.erc20Token.safeTransfer(address(msg.sender), _amount);
         }
 
-        user.rewardDebt = user.amount.mul(pool.accLptPerShare).div(1e18);
+        user.rewardDebt = user.amount.mul(pool.accRewardPerShare).div(1e18);
         emit Withdraw(msg.sender, _pid, _amount);
     }
 
@@ -292,13 +291,13 @@ contract LaunchPoolStakingWithGuild is Ownable {
     // Private /
     ////////////
 
-    /// @dev Safe LPT transfer function, just in case if rounding error causes pool to not have enough LPTs.
-    /// @param _to Whom to send LPT into
-    /// @param _amount of LPT to send
-    function safeLptTransfer(address _to, uint256 _amount) private {
-        uint256 lptBal = rewardGuildBank.tokenBalance();
-        if (_amount > lptBal) {
-            rewardGuildBank.withdrawTo(_to, lptBal);
+    /// @dev Safe reward transfer function, just in case if rounding error causes pool to not have enough rewards.
+    /// @param _to Whom to send reward into
+    /// @param _amount of reward to send
+    function safeRewardTransfer(address _to, uint256 _amount) private {
+        uint256 bal = rewardGuildBank.tokenBalance();
+        if (_amount > bal) {
+            rewardGuildBank.withdrawTo(_to, bal);
         } else {
             rewardGuildBank.withdrawTo(_to, _amount);
         }
