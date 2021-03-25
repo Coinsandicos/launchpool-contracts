@@ -162,6 +162,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     function updateFundRaisingRecipient(uint256 _pid, address payable _fundRaisingRecipient) external onlyOwner {
         require(_pid < poolInfo.length, "Invalid PID");
         require(_fundRaisingRecipient != address(0), "New recipient cannot be zero address");
+
         emit FundRaisingRecipientUpdated(_pid, poolInfo[_pid].fundRaisingRecipient, _fundRaisingRecipient);
         poolInfo[_pid].fundRaisingRecipient = _fundRaisingRecipient;
     }
@@ -169,6 +170,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     // step 1
     function pledge(uint256 _pid, uint256 _amount) external nonReentrant {
         require(_pid < poolInfo.length, "pledge: Invalid PID");
+
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
 
@@ -181,6 +183,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
         user.amount = user.amount.add(_amount);
         user.tokenAllocDebt = user.amount.mul(poolIdToAccPercentagePerShare[_pid]).div(1e18);
+
         poolIdToTotalStaked[_pid] = poolIdToTotalStaked[_pid].add(_amount);
 
         stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
