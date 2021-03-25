@@ -10,6 +10,8 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import { FundRaisingGuild } from "./FundRaisingGuild.sol";
 
+import "hardhat/console.sol";
+
 /// @title Fund raising platform facilitated by launch pool
 /// @author BlockRocket.tech
 /// @notice Fork of MasterChef.sol from SushiSwap
@@ -22,12 +24,13 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     struct UserInfo {
         uint256 amount;     // How many tokens are staked in a pool
         uint256 pledgeFundingAmount; // Based on staked tokens, the funding that has come from the user (or not if they choose to pull out)
-        uint256 rewardDebt; // Reward debt. See explanation below.
+        uint256 rewardDebtRewards; // Reward debt. See explanation below.
+        uint256 tokenAllocDebt;
         //
         // We do some fancy math here. Basically, once vesting has started in a pool (if they have deposited), the amount of reward tokens
         // entitled to a user but is pending to be distributed is:
         //
-        //   pending reward = (user.amount * pool.accRewardPerShare) - user.rewardDebt
+        //   pending reward = (user.amount * pool.accRewardPerShare) - user.rewardDebtRewards
         //
         // The amount can never change once the staking period has ended
     }
@@ -192,6 +195,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         updatePool(_pid);
 
         user.amount = user.amount.add(_amount);
+        user.tokenAllocDebt = user.amount.mul(poolIdToAccPercentagePerShare[_pid]).div(1e18);
         poolIdToTotalStaked[_pid] = poolIdToTotalStaked[_pid].add(_amount);
 
         stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
@@ -206,7 +210,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
         (uint256 accPercentPerShare,) = getAccPercentagePerShareAndLastAllocBlock(_pid);
 
-        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18);
+        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18).sub(user.tokenAllocDebt);
         return userPercentageAllocated.mul(pool.targetRaise).div(TOTAL_TOKEN_ALLOCATION_POINTS);
     }
 
@@ -297,7 +301,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
             accRewardPerShare = accRewardPerShare.add(reward.mul(1e18).div(TOTAL_TOKEN_ALLOCATION_POINTS));
         }
 
-        return user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebt);
+        return user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebtRewards);
     }
 
     function massUpdatePools() public {
@@ -316,8 +320,16 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
             return;
         }
 
-        // staking not finished
-        if (block.number <= poolInfo.stakingEndBlock) {
+        // if no one staked, nothing to do
+        if (poolIdToTotalStaked[_pid] == 0) {
+            return;
+        }
+
+        // token allocation not finished
+        uint256 maxEndBlockForPercentAlloc = block.number <= poolInfo.stakingEndBlock ? block.number : poolInfo.stakingEndBlock;
+        uint256 blocksSinceLastPercentAlloc = getMultiplier(poolIdToLastPercentageAllocBlock[_pid], maxEndBlockForPercentAlloc);
+
+        if (poolIdToRewardEndBlock[_pid] == 0 && blocksSinceLastPercentAlloc > 0) {
             (uint256 accPercentPerShare, uint256 lastAllocBlock) = getAccPercentagePerShareAndLastAllocBlock(_pid);
             poolIdToAccPercentagePerShare[_pid] = accPercentPerShare;
             poolIdToLastPercentageAllocBlock[_pid] = lastAllocBlock;
@@ -377,10 +389,10 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         PoolInfo storage pool = poolInfo[_pid];
 
         uint256 accRewardPerShare = poolIdToAccRewardPerShareVesting[_pid];
-        uint256 pending = user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebt);
+        uint256 pending = user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebtRewards);
 
         if (pending > 0) {
-            user.rewardDebt = user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18);
+            user.rewardDebtRewards = user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18);
             safeRewardTransfer(pool.rewardToken, msg.sender, pending);
 
             emit RewardClaimed(msg.sender, _pid, pending);

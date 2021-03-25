@@ -73,8 +73,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     const contractEthBalance = await balance.tracker(this.fundRaising.address)
 
     const pledgeFundingAmount = await this.fundRaising.getPledgeFundingAmount(poolId, {from: sender})
-    console.log('pledgeFundingAmount', pledgeFundingAmount.toString())
-
     const {receipt} = await this.fundRaising.fundPledge(poolId, {from: sender, value: pledgeFundingAmount})
 
     await expectEvent(receipt, 'PledgeFunded', {
@@ -780,7 +778,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, bob) // Bob will have to fund 1/2
 
         // move to midway through staking
-        await time.advanceBlockTo(this.stakingEndBlock.sub(toBn('49')))
+        await time.advanceBlockTo(this.stakingEndBlock.sub(toBn('50')))
 
         // whale enters with 1.5k tokens - getting 50% of token alloc from this point on
         await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS.muln(2), whale)
@@ -822,7 +820,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         const poolIdToRewardPerBlock = await this.fundRaising.poolIdToRewardPerBlock(POOL_ZERO)
         const totalRewardsForAliceAndBobAfter5Blocks = poolIdToRewardPerBlock.muln(5)
         let singleUnitOfRewards = totalRewardsForAliceAndBobAfter5Blocks.divn(10000)
-        const totalRewardsAlice = singleUnitOfRewards.muln(3750) // alice gets 37.5% of the token allocation
+        const totalRewardsAlice = singleUnitOfRewards.muln(3800) // alice gets 38% of the token allocation
 
         const aliceRewardTokenBalAfterClaim = await this.rewardToken1.balanceOf(alice)
 
@@ -831,7 +829,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         // bob claims after 6 blocks
         const totalRewardsForAliceAndBobAfter6Blocks = poolIdToRewardPerBlock.muln(6)
         singleUnitOfRewards = totalRewardsForAliceAndBobAfter6Blocks.divn(10000)
-        const totalRewardsBob = singleUnitOfRewards.muln(3750) // bob gets 37.5 too
+        const totalRewardsBob = singleUnitOfRewards.muln(3800) // bob gets 38 too
 
         await this.fundRaising.claimReward(POOL_ZERO, {from: bob})
 
