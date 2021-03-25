@@ -8,9 +8,9 @@ async function main() {
     deployerAddress
   );
 
-  const tokenName = 'CHT';
-  const tokenSymbol = 'CHT';
-  const initialSupply = '5000000'; // 5 million
+  const tokenName = 'Fly Holding token';
+  const tokenSymbol = 'FLYHT';
+  const initialSupply = '5555555'; // 5555555
   const initialSupplyRecipient = deployerAddress; // deployer
 
   console.log('Token name', tokenName);

@@ -8,7 +8,7 @@ async function main() {
   );
 
   const tokenAddress = prompt('Token address? '); // TBC
-  const maxRewards = prompt('Max rewards? '); // 5000000
+  const maxRewards = prompt('Max rewards? '); // 58823.5
   const startBlock = prompt('Start block? '); // 12141500 - https://etherscan.io/block/countdown/12141500
   const endBlock = prompt('End block? '); // 12154500 - https://etherscan.io/block/countdown/12154500
 
