@@ -104,6 +104,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     event RewardClaimed(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event FundRaisingClaimed(uint256 indexed pid, address indexed recipient, uint256 amount);
+    event FundRaisingRecipientUpdated(uint256 indexed pid, address indexed oldRecipient, address indexed newRecipient);
 
     /// @param _stakingToken Address of the staking token for all pools
     constructor(IERC20 _stakingToken) public {
@@ -158,28 +159,12 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         emit PoolAdded(poolInfo.length.sub(1));
     }
 
-    // todo define what can be updated - fund raising recipient for example
-//    /// @notice Update a pool's allocation point to increase or decrease its share of contract-level rewards
-//    /// @notice Can also update the max amount that can be staked per user
-//    /// @dev Can only be called by the owner
-//    /// @param _pid ID of the pool being updated
-//    /// @param _allocPoint New allocation point
-//    /// @param _maxStakingAmountPerUser Maximum amount that a user can deposit into the far
-//    /// @param _withUpdate Set to true if you want to update all pools before making this change - it will checkpoint those rewards
-//    function set(uint256 _pid, uint256 _allocPoint, uint256 _maxStakingAmountPerUser, bool _withUpdate) public onlyOwner {
-//        require(block.number < endBlock, "set: must be before end");
-//        require(_pid < poolInfo.length, "set: invalid _pid");
-//        require(_maxStakingAmountPerUser > 0, "set: _maxStakingAmountPerUser must be greater than zero");
-//
-//        if (_withUpdate) {
-//            massUpdatePools();
-//        }
-//
-//        totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(_allocPoint);
-//
-//        poolInfo[_pid].allocPoint = _allocPoint;
-//        poolInfo[_pid].maxStakingAmountPerUser = _maxStakingAmountPerUser;
-//    }
+    function updateFundRaisingRecipient(uint256 _pid, address payable _fundRaisingRecipient) external onlyOwner {
+        require(_pid < poolInfo.length, "Invalid PID");
+        require(_fundRaisingRecipient != address(0), "New recipient cannot be zero address");
+        emit FundRaisingRecipientUpdated(_pid, poolInfo[_pid].fundRaisingRecipient, _fundRaisingRecipient);
+        poolInfo[_pid].fundRaisingRecipient = _fundRaisingRecipient;
+    }
 
     // step 1
     function pledge(uint256 _pid, uint256 _amount) external nonReentrant {
