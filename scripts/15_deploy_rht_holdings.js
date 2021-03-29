@@ -8,6 +8,14 @@ async function main() {
     deployerAddress
   );
 
+//   * Name: RHT
+//   * Symbol: RHT
+//   * Decimals: 18
+//   * Rewards: 150,000
+//   * Limit: NO LIMIT
+//   * Start: (31st Mar 4pm)
+//   * End: 12154500 (1st Apr)
+
   const tokenName = 'RHT';
   const tokenSymbol = 'RHT';
   const initialSupply = '150000'; // 150k

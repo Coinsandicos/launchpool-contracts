@@ -8,6 +8,14 @@ async function main() {
     deployerAddress
   );
 
+//   * Name: FLYHT
+//   * Symbol: FLYHT
+//   * Decimals: 18
+//   * Rewards:  5,555,555
+//   * Limit: NO LIMIT
+//   * Start: 12141500 (30th Mar 4pm)
+//   * End: 12154500 (1st Apr 4pm ish)
+
   const tokenName = 'Fly Holding token';
   const tokenSymbol = 'FLYHT';
   const initialSupply = '5555555'; // 5555555

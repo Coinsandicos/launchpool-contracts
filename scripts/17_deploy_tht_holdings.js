@@ -8,6 +8,15 @@ async function main() {
     deployerAddress
   );
 
+
+//   * Name: THT
+//   * Symbol: THT
+//   * Decimals: 18
+//   * Rewards: 58,823.5
+//   * Limit: NO LIMIT
+//   * Start: 12141500 (30th Mar 4pm)
+//   * End: 12154500 (1st Apr 4pm ish)
+
   const tokenName = 'THT';
   const tokenSymbol = 'THT';
   const initialSupply = '58823.5'; // 58823.5

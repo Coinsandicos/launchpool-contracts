@@ -7,6 +7,15 @@ async function main() {
     await deployer.getAddress()
   );
 
+
+//   * Name: RHT
+//   * Symbol: RHT
+//   * Decimals: 18
+//   * Rewards: 150,000
+//   * Limit: NO LIMIT
+//   * Start: (31st Mar 4pm)
+//   * End: 12154500 (1st Apr)
+
   const tokenAddress = prompt('Token address? '); // TBC
   const maxRewards = prompt('Max rewards? '); // 150000 / 150k
   const startBlock = prompt('Start block? '); // 12141500 - https://etherscan.io/block/countdown/12141500
