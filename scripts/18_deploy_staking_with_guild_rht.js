@@ -13,7 +13,7 @@ async function main() {
 //   * Decimals: 18
 //   * Rewards: 150,000
 //   * Limit: NO LIMIT
-//   * Start: (31st Mar 4pm)
+//   * Start: 12148000 (31st Mar 4pm)
 //   * End: 12154500 (1st Apr)
 
   const tokenAddress = prompt('Token address? '); // 0x636253B86AdcfBb3A1Ac20458ccD3552e4bC3d67
