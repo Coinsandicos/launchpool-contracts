@@ -16,7 +16,7 @@ async function main() {
 //   * Start: 12141500 (30th Mar 4pm)
 //   * End: 12154500 (1st Apr 4pm ish)
 
-  const tokenAddress = prompt('Token address? '); // TBC
+  const tokenAddress = prompt('Token address? '); // 0x8B8058ffC25353dcDCAED0FB85cEc5985859057d
   const maxRewards = prompt('Max rewards? '); // 5555555
   const startBlock = prompt('Start block? '); // 12141500 - https://etherscan.io/block/countdown/12141500
   const endBlock = prompt('End block? '); // 12154500 - https://etherscan.io/block/countdown/12154500

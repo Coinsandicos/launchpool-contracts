@@ -16,7 +16,7 @@ async function main() {
 //   * Start: 12141500 (30th Mar 4pm)
 //   * End: 12154500 (1st Apr 4pm ish)
 
-  const tokenName = 'Fly Holding token';
+  const tokenName = 'FLYHT';
   const tokenSymbol = 'FLYHT';
   const initialSupply = '5555555'; // 5555555
   const initialSupplyRecipient = deployerAddress; // deployer

@@ -19,7 +19,7 @@ async function main() {
 
   const tokenName = 'THT';
   const tokenSymbol = 'THT';
-  const initialSupply = '58823.5'; // 58823.5
+  const initialSupply = '58824'; // todo 58823.5
   const initialSupplyRecipient = deployerAddress; // deployer
 
   console.log('Token name', tokenName);
