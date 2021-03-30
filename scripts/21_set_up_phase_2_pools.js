@@ -20,45 +20,85 @@ async function main() {
     deployer //provider
   );
 
-  const pools = [
+  const projects = [
     [
-      '0x8370454ee905f2328ca80dbb955b567c417d0d63', //Blockrocket
-      '8296971',
-      '8309971',
-      '8316471',
-      ethers.utils.parseEther('5'),
-      deployerAddress,
-      '100'
-    ]
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8330000', '8330250', '8330750', ethers.utils.parseEther('5'), deployerAddress, '50'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8330000', '8330250', '8330750', ethers.utils.parseEther('5'), deployerAddress, '250'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8330000', '8330250', '8330750', ethers.utils.parseEther('5'), deployerAddress, '10000000']
+    ], // Mixsome (All Pools)
+    [
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8330500', '8330750', '8331250', ethers.utils.parseEther('5'), deployerAddress, '50'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8330500', '8330750', '8331250', ethers.utils.parseEther('5'), deployerAddress, '250'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8330500', '8330750', '8331250', ethers.utils.parseEther('5'), deployerAddress, '10000000']
+    ], // Unizen (All Pools)
+    [
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8331000', '8331250', '8331750', ethers.utils.parseEther('5'), deployerAddress, '50'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8331000', '8331250', '8331750', ethers.utils.parseEther('5'), deployerAddress, '250'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8331000', '8331250', '8331750', ethers.utils.parseEther('5'), deployerAddress, '10000000']
+    ], // Blocky Blocks (All Pools)
+    [
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8331500', '8331750', '8332250', ethers.utils.parseEther('5'), deployerAddress, '50'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8331500', '8331750', '8332250', ethers.utils.parseEther('5'), deployerAddress, '250'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8331500', '8331750', '8332250', ethers.utils.parseEther('5'), deployerAddress, '10000000']
+    ], // Coin Shapers (All Pools)
+    [
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8332000', '8332500', '8332750', ethers.utils.parseEther('5'), deployerAddress, '50'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8332000', '8332500', '8332750', ethers.utils.parseEther('5'), deployerAddress, '250'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8332000', '8332500', '8332750', ethers.utils.parseEther('5'), deployerAddress, '10000000']
+    ], // Alphabit (All Pools)
+    [
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8336000', '8336250', '8336750', ethers.utils.parseEther('5'), deployerAddress, '50'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8336000', '8336250', '8336750', ethers.utils.parseEther('5'), deployerAddress, '250'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8336000', '8336250', '8336750', ethers.utils.parseEther('5'), deployerAddress, '10000000']
+    ], // To The Moon  (All Pools)
+    [
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8336500', '8336750', '8337250', ethers.utils.parseEther('5'), deployerAddress, '50'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8336500', '8336750', '8337250', ethers.utils.parseEther('5'), deployerAddress, '250'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8336500', '8336750', '8337250', ethers.utils.parseEther('5'), deployerAddress, '10000000']
+    ], // CircleChain (All Pools)
+    [
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8337000', '8337250', '8337750', ethers.utils.parseEther('5'), deployerAddress, '50'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8337000', '8337250', '8337750', ethers.utils.parseEther('5'), deployerAddress, '250'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8337000', '8337250', '8337750', ethers.utils.parseEther('5'), deployerAddress, '10000000']
+    ], // Digitalist (All Pools)
+    [
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8337500', '8337750', '8338250', ethers.utils.parseEther('5'), deployerAddress, '50'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8337500', '8337750', '8338250', ethers.utils.parseEther('5'), deployerAddress, '250'],
+      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8337500', '8337750', '8338250', ethers.utils.parseEther('5'), deployerAddress, '10000000']
+    ], // Firechain (All Pools)
   ];
 
-  console.log(`Adding ${pools.length} pools`);
+  console.log(`Adding 3 pools for ${projects.length} projects`);
 
-  for (let x = 0; x < pools.length; x++) {
-    const [
-      rewardToken,
-      tokenAllocStartBlock,
-      stakingEndBlock,
-      pledgeFundingEndBlock,
-      targetRaise,
-      fundRaisingRecipient,
-      maxStakingPerUser
-    ] = pools[x]
+  for (let x = 0; x < projects.length; x++) {
+    const projectPools = projects[x]
 
-    prompt(`Adding pool ${x + 1} with data {${rewardToken}-${tokenAllocStartBlock}-${stakingEndBlock}} - hit enter to continue`);
+    for (let y = 0; y < projectPools.length; y++) {
+      const [
+        rewardToken,
+        tokenAllocStartBlock,
+        stakingEndBlock,
+        pledgeFundingEndBlock,
+        targetRaise,
+        fundRaisingRecipient,
+        maxStakingPerUser
+      ] = projectPools[y]
 
-    await staking.add(
-      rewardToken,
-      tokenAllocStartBlock,
-      stakingEndBlock,
-      pledgeFundingEndBlock,
-      targetRaise,
-      fundRaisingRecipient,
-      ethers.utils.parseEther(maxStakingPerUser.toString()),
-      false
-    );
+      //prompt(`Adding pool ${y + 1} with data {${rewardToken}-${tokenAllocStartBlock}-${stakingEndBlock}} - hit enter to continue`);
 
-    console.log(`pool added`);
+      await staking.add(
+        rewardToken,
+        tokenAllocStartBlock,
+        stakingEndBlock,
+        pledgeFundingEndBlock,
+        targetRaise,
+        fundRaisingRecipient,
+        ethers.utils.parseEther(maxStakingPerUser.toString()),
+        false
+      );
+
+      console.log(`pool added`);
+    }
   }
 
   console.log('Finished!');
