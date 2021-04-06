@@ -16,7 +16,7 @@ contract Guild {
 
     function withdrawTo(address _recipient, uint256 _amount) external {
         require(msg.sender == stakingContract, "Guild.withdrawTo: Only staking contract");
-        token.transfer(_recipient, _amount);
+        require(token.transfer(_recipient, _amount), "Guild.withdrawTo: Transfer failed");
     }
 
     function tokenBalance() external returns (uint256) {

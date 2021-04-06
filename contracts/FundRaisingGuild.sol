@@ -14,7 +14,7 @@ contract FundRaisingGuild {
 
     function withdrawTo(IERC20 _token, address _recipient, uint256 _amount) external {
         require(msg.sender == stakingContract, "Guild.withdrawTo: Only staking contract");
-        _token.transfer(_recipient, _amount);
+        require(_token.transfer(_recipient, _amount), "Guild.withdrawTo: Transfer failed");
     }
 
     function tokenBalance(IERC20 _token) external returns (uint256) {
