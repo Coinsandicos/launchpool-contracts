@@ -86,6 +86,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     // Total amount of funding received by stakers after stakingEndBlock and before pledgeFundingEndBlock
     mapping(uint256 => uint256) public poolIdToTotalRaised;
 
+    // For every staker that funded their pledge, the sum of all of their allocated percentages
+    mapping(uint256 => uint256) public poolIdToTotalFundedPercentageOfTargetRaise;
+
     // True when funds have been claimed
     mapping(uint256 => bool) public poolIdToFundsClaimed;
 
@@ -222,6 +225,11 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         require(msg.value == getPledgeFundingAmount(_pid), "fundPledge: Required ETH amount not satisfied");
 
         poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(msg.value);
+
+        (uint256 accPercentPerShare,) = getAccPercentagePerShareAndLastAllocBlock(_pid);
+        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18).sub(user.tokenAllocDebt);
+        poolIdToTotalFundedPercentageOfTargetRaise[_pid] = poolIdToTotalFundedPercentageOfTargetRaise[_pid].add(userPercentageAllocated);
+
         user.pledgeFundingAmount = msg.value; // ensures pledges can only be done once
 
         stakingToken.safeTransfer(address(msg.sender), user.amount);
@@ -273,11 +281,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
             return 0;
         }
 
-        // cliff not served
-        if (poolIdToRewardCliffEndBlock[_pid] > block.number) {
-            return 0;
-        }
-
         uint256 accRewardPerShare = poolIdToAccRewardPerShareVesting[_pid];
         uint256 rewardEndBlock = poolIdToRewardEndBlock[_pid];
         uint256 lastRewardBlock = poolIdToLastRewardBlock[_pid];
@@ -286,7 +289,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
             uint256 maxEndBlock = block.number <= rewardEndBlock ? block.number : rewardEndBlock;
             uint256 multiplier = getMultiplier(lastRewardBlock, maxEndBlock);
             uint256 reward = multiplier.mul(rewardPerBlock);
-            accRewardPerShare = accRewardPerShare.add(reward.mul(1e18).div(TOTAL_TOKEN_ALLOCATION_POINTS));
+            accRewardPerShare = accRewardPerShare.add(reward.mul(1e18).div(poolIdToTotalFundedPercentageOfTargetRaise[_pid]));
         }
 
         (uint256 accPercentPerShare,) = getAccPercentagePerShareAndLastAllocBlock(_pid);
@@ -348,7 +351,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         uint256 rewardPerBlock = poolIdToRewardPerBlock[_pid];
         uint256 reward = multiplier.mul(rewardPerBlock);
 
-        poolIdToAccRewardPerShareVesting[_pid] = poolIdToAccRewardPerShareVesting[_pid].add(reward.mul(1e18).div(TOTAL_TOKEN_ALLOCATION_POINTS));
+        poolIdToAccRewardPerShareVesting[_pid] = poolIdToAccRewardPerShareVesting[_pid].add(reward.mul(1e18).div(poolIdToTotalFundedPercentageOfTargetRaise[_pid]));
         poolIdToLastRewardBlock[_pid] = maxEndBlock;
     }
 
