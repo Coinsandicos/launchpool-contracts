@@ -289,7 +289,9 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
             accRewardPerShare = accRewardPerShare.add(reward.mul(1e18).div(TOTAL_TOKEN_ALLOCATION_POINTS));
         }
 
-        return user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebtRewards);
+        (uint256 accPercentPerShare,) = getAccPercentagePerShareAndLastAllocBlock(_pid);
+        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18).sub(user.tokenAllocDebt);
+        return userPercentageAllocated.mul(accRewardPerShare).div(1e18).sub(user.rewardDebtRewards);
     }
 
     function massUpdatePools() public {
@@ -377,10 +379,13 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         PoolInfo storage pool = poolInfo[_pid];
 
         uint256 accRewardPerShare = poolIdToAccRewardPerShareVesting[_pid];
-        uint256 pending = user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18).sub(user.rewardDebtRewards);
+
+        (uint256 accPercentPerShare,) = getAccPercentagePerShareAndLastAllocBlock(_pid);
+        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18).sub(user.tokenAllocDebt);
+        uint256 pending = userPercentageAllocated.mul(accRewardPerShare).div(1e18).sub(user.rewardDebtRewards);
 
         if (pending > 0) {
-            user.rewardDebtRewards = user.pledgeFundingAmount.mul(accRewardPerShare).div(1e18);
+            user.rewardDebtRewards = userPercentageAllocated.mul(accRewardPerShare).div(1e18);
             safeRewardTransfer(pool.rewardToken, msg.sender, pending);
 
             emit RewardClaimed(msg.sender, _pid, pending);
