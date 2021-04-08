@@ -42,7 +42,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         uint256 stakingEndBlock; // Before this block, staking is permitted
         uint256 pledgeFundingEndBlock; // Between stakingEndBlock and this number pledge funding is permitted
         uint256 targetRaise; // Amount that the project wishes to raise
-        address payable fundRaisingRecipient; // The account that can claim the funds raised
         uint256 maxStakingAmountPerUser; // Max. amount of tokens that can be staked per account/user
     }
 
@@ -107,7 +106,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     event RewardClaimed(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event FundRaisingClaimed(uint256 indexed pid, address indexed recipient, uint256 amount);
-    event FundRaisingRecipientUpdated(uint256 indexed pid, address indexed oldRecipient, address indexed newRecipient);
 
     /// @param _stakingToken Address of the staking token for all pools
     constructor(IERC20 _stakingToken) public {
@@ -132,7 +130,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         uint256 _stakingEndBlock,
         uint256 _pledgeFundingEndBlock,
         uint256 _targetRaise,
-        address payable _fundRaisingRecipient,
         uint256 _maxStakingAmountPerUser,
         bool _withUpdate
     ) public onlyOwner {
@@ -141,7 +138,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         require(_tokenAllocationStartBlock < _stakingEndBlock, "add: _tokenAllocationStartBlock must be before staking end");
         require(_stakingEndBlock < _pledgeFundingEndBlock, "add: staking end must be before funding end");
         require(_targetRaise > 0, "add: Invalid raise amount");
-        require(_fundRaisingRecipient != address(0), "add: _fundRaisingRecipient is zero address");
 
         if (_withUpdate) {
             massUpdatePools();
@@ -153,21 +149,12 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
             stakingEndBlock: _stakingEndBlock,
             pledgeFundingEndBlock: _pledgeFundingEndBlock,
             targetRaise: _targetRaise,
-            fundRaisingRecipient: _fundRaisingRecipient,
             maxStakingAmountPerUser: _maxStakingAmountPerUser
         }));
 
         poolIdToLastPercentageAllocBlock[poolInfo.length.sub(1)] = _tokenAllocationStartBlock;
 
         emit PoolAdded(poolInfo.length.sub(1));
-    }
-
-    function updateFundRaisingRecipient(uint256 _pid, address payable _fundRaisingRecipient) external onlyOwner {
-        require(_pid < poolInfo.length, "Invalid PID");
-        require(_fundRaisingRecipient != address(0), "New recipient cannot be zero address");
-
-        emit FundRaisingRecipientUpdated(_pid, poolInfo[_pid].fundRaisingRecipient, _fundRaisingRecipient);
-        poolInfo[_pid].fundRaisingRecipient = _fundRaisingRecipient;
     }
 
     // step 1
@@ -243,7 +230,8 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
     }
 
     // step 3
-    function setupVestingRewards(uint256 _pid, uint256 _rewardAmount,  uint256 _rewardStartBlock, uint256 _rewardCliffEndBlock, uint256 _rewardEndBlock) external nonReentrant {
+    function setupVestingRewards(uint256 _pid, uint256 _rewardAmount,  uint256 _rewardStartBlock, uint256 _rewardCliffEndBlock, uint256 _rewardEndBlock)
+    external nonReentrant onlyOwner {
         require(_pid < poolInfo.length, "setupVestingRewards: Invalid PID");
         require(_rewardStartBlock > block.number, "setupVestingRewards: start block in the past");
         require(_rewardCliffEndBlock >= _rewardStartBlock, "setupVestingRewards: Cliff must be after or equal to start block");
@@ -252,7 +240,6 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         PoolInfo storage pool = poolInfo[_pid];
 
         require(block.number > pool.pledgeFundingEndBlock, "setupVestingRewards: Stakers are still pledging");
-        require(msg.sender == pool.fundRaisingRecipient, "setupVestingRewards: Only fund raising recipient");
 
         uint256 vestingLength = _rewardEndBlock.sub(_rewardStartBlock);
 
@@ -417,19 +404,18 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         emit Withdraw(msg.sender, _pid, withdrawAmount);
     }
 
-    function claimFundRaising(uint256 _pid) external nonReentrant {
+    function claimFundRaising(uint256 _pid) external nonReentrant onlyOwner {
         require(_pid < poolInfo.length, "claimFundRaising: invalid _pid");
         PoolInfo storage pool = poolInfo[_pid];
 
         uint256 rewardPerBlock = poolIdToRewardPerBlock[_pid];
         require(rewardPerBlock != 0, "claimFundRaising: rewards not yet sent");
         require(poolIdToFundsClaimed[_pid] == false, "claimFundRaising: Already claimed funds");
-        require(msg.sender == pool.fundRaisingRecipient, "claimFundRaising: Only fundraising recipient");
 
         poolIdToFundsClaimed[_pid] = true;
-        pool.fundRaisingRecipient.call{value: poolIdToTotalRaised[_pid]}("");
+        owner().call{value: poolIdToTotalRaised[_pid]}("");
 
-        emit FundRaisingClaimed(_pid, pool.fundRaisingRecipient, poolIdToTotalRaised[_pid]);
+        emit FundRaisingClaimed(_pid, owner(), poolIdToTotalRaised[_pid]);
     }
 
     ////////////

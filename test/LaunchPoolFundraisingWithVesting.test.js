@@ -162,7 +162,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           'Reward1',
           'Reward1',
           ONE_HUNDRED_THOUSAND_TOKENS,
-          {from: project1Admin}
+          {from: deployer}
         )
 
         this.stakingEndBlock = this.currentBlock.add(toBn('110'))
@@ -175,14 +175,13 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.stakingEndBlock,
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
-          project1Admin,
           TEN_MILLION_TOKENS,
           false,
           {from: deployer}
         )
       })
 
-      it('Can farm reward tokens once all stages have passed', async () => {
+      it.only('Can farm reward tokens once all stages have passed', async () => {
         // let alice and bob pledge funding by staking LPOOL
         await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice) // Alice will have to fund 2/3 of the target raise
         await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS.divn(2), bob) // Bob will have to fund 1/3
@@ -210,7 +209,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
-          project1Admin
+          deployer
         )
 
         // rewards will come through after a few blocks
@@ -262,7 +261,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.stakingEndBlock,
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
-          project1Admin,
           TEN_MILLION_TOKENS,
           false,
           {from: deployer}
@@ -324,7 +322,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.stakingEndBlockProject2,
           this.pledgeFundingEndBlockProject2,
           this.project2TargetRaise,
-          project2Admin,
           TEN_MILLION_TOKENS,
           true,
           {from: deployer}
@@ -433,7 +430,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.stakingEndBlock,
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
-          project1Admin,
           TEN_MILLION_TOKENS,
           false,
           {from: deployer}
@@ -488,7 +484,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.stakingEndBlockProject2,
           this.pledgeFundingEndBlockProject2,
           this.project2TargetRaise,
-          project2Admin,
           TEN_MILLION_TOKENS,
           true,
           {from: deployer}
@@ -597,7 +592,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.stakingEndBlock,
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
-          project1Admin,
           TEN_MILLION_TOKENS,
           false,
           {from: deployer}
@@ -661,7 +655,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.stakingEndBlockProject2,
           this.pledgeFundingEndBlockProject2,
           this.project2TargetRaise,
-          project2Admin,
           TEN_MILLION_TOKENS,
           true,
           {from: deployer}
@@ -765,7 +758,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.stakingEndBlock,
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
-          project1Admin,
           TEN_MILLION_TOKENS,
           false,
           {from: deployer}
@@ -849,7 +841,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           1,
           2,
           3,
-          project1Admin,
           TEN_MILLION_TOKENS,
           false
         ),
@@ -865,7 +856,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           2,
           1,
           1,
-          project1Admin,
           TEN_MILLION_TOKENS,
           false
         ),
@@ -881,27 +871,10 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           1,
           2,
           0,
-          project1Admin,
           TEN_MILLION_TOKENS,
           false
         ),
         "add: Invalid raise amount"
-      )
-    })
-
-    it('Reverts when fund raising recipient is address zero', async () => {
-      await expectRevert(
-        this.fundRaising.add(
-          this.launchPoolToken.address,
-          0,
-          1,
-          2,
-          1,
-          constants.ZERO_ADDRESS,
-          TEN_MILLION_TOKENS,
-          false
-        ),
-        "add: _fundRaisingRecipient is zero address"
       )
     })
 
@@ -913,7 +886,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           1,
           2,
           1,
-          constants.ZERO_ADDRESS,
           TEN_MILLION_TOKENS,
           false
         ),
@@ -949,7 +921,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
-        project1Admin,
         TEN_MILLION_TOKENS,
         false,
         {from: deployer}
@@ -980,7 +951,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
-        project1Admin,
         TEN_MILLION_TOKENS,
         false,
         {from: deployer}
@@ -1014,7 +984,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
-        project1Admin,
         TEN_MILLION_TOKENS,
         false,
         {from: deployer}
@@ -1063,7 +1032,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
-        project1Admin,
         TEN_MILLION_TOKENS,
         false,
         {from: deployer}
@@ -1101,7 +1069,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
-        project1Admin,
         TEN_MILLION_TOKENS,
         false,
         {from: deployer}
@@ -1132,7 +1099,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
-        project1Admin,
         TEN_MILLION_TOKENS,
         false,
         {from: deployer}
@@ -1165,7 +1131,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
-        project1Admin,
         TEN_MILLION_TOKENS,
         false,
         {from: deployer}
@@ -1200,7 +1165,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
-        project1Admin,
         TEN_MILLION_TOKENS,
         false,
         {from: deployer}
@@ -1245,7 +1209,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.stakingEndBlock,
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
-          project1Admin,
           TEN_MILLION_TOKENS,
           false,
           {from: deployer}
@@ -1305,7 +1268,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
         await expectRevert(
           this.fundRaising.setupVestingRewards(POOL_ZERO, ONE_HUNDRED_THOUSAND_TOKENS, rewardStart, rewardCliff, rewardEnd, {from: daniel}),
-          "setupVestingRewards: Only fund raising recipient"
+          "Ownable: caller is not the owner"
         )
       })
     })
@@ -1330,7 +1293,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
-        project1Admin,
         TEN_MILLION_TOKENS,
         false,
         {from: deployer}
@@ -1347,7 +1309,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         'Reward1',
         'Reward1',
         ONE_HUNDRED_THOUSAND_TOKENS,
-        {from: project1Admin}
+        {from: deployer}
       )
 
       this.stakingEndBlock = this.currentBlock.add(toBn('100'))
@@ -1360,7 +1322,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
-        project1Admin,
         TEN_MILLION_TOKENS,
         false,
         {from: deployer}
@@ -1401,7 +1362,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         _1BlockPastFundingEndBlock.add(toBn('5')),
         _1BlockPastFundingEndBlock.add(toBn('50')),
         _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
-        project1Admin
+        deployer
       )
 
       await expectRevert(
@@ -1447,7 +1408,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           'Reward1',
           'Reward1',
           ONE_HUNDRED_THOUSAND_TOKENS,
-          {from: project1Admin}
+          {from: deployer}
         )
 
         this.stakingEndBlock = this.currentBlock.add(toBn('100'))
@@ -1460,7 +1421,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           this.stakingEndBlock,
           this.pledgeFundingEndBlock,
           this.project1TargetRaise,
-          project1Admin,
           TEN_MILLION_TOKENS,
           false,
           {from: deployer}
@@ -1483,7 +1443,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
 
         // ensure fund raising cannot be claimed before rewards are sent
         await expectRevert(
-          this.fundRaising.claimFundRaising(POOL_ZERO, {from: project1Admin}),
+          this.fundRaising.claimFundRaising(POOL_ZERO, {from: deployer}),
           "claimFundRaising: rewards not yet sent"
         )
 
@@ -1495,23 +1455,23 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
-          project1Admin
+          deployer
         )
       })
 
       it('Can claim the raised funds', async () => {
-        const project1AdminBalanceTracker = await balance.tracker(project1Admin)
+        const deployerBalanceTracker = await balance.tracker(deployer)
 
-        const {receipt} = await this.fundRaising.claimFundRaising(POOL_ZERO, {from: project1Admin})
+        const {receipt} = await this.fundRaising.claimFundRaising(POOL_ZERO, {from: deployer})
 
         let {raised} = (await this.fundRaising.getTotalRaisedVsTarget(POOL_ZERO, {from: alice}))
-        expect(await project1AdminBalanceTracker.delta()).to.be.bignumber.equal(raised.sub(txFee(receipt)))
+        expect(await deployerBalanceTracker.delta()).to.be.bignumber.equal(raised.sub(txFee(receipt)))
       })
 
       it('Reverts when rewards have already been claimed', async () => {
-        await this.fundRaising.claimFundRaising(POOL_ZERO, {from: project1Admin})
+        await this.fundRaising.claimFundRaising(POOL_ZERO, {from: deployer})
         await expectRevert(
-          this.fundRaising.claimFundRaising(POOL_ZERO, {from: project1Admin}),
+          this.fundRaising.claimFundRaising(POOL_ZERO, {from: deployer}),
           "claimFundRaising: Already claimed funds"
         )
       })
@@ -1519,7 +1479,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
       it('Reverts when sender is not the project admin', async () => {
         await expectRevert(
           this.fundRaising.claimFundRaising(POOL_ZERO, {from: bob}),
-          "claimFundRaising: Only fundraising recipient"
+          "Ownable: caller is not the owner"
         )
       })
     })
@@ -1554,7 +1514,6 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         this.stakingEndBlock,
         this.pledgeFundingEndBlock,
         this.project1TargetRaise,
-        project1Admin,
         TEN_MILLION_TOKENS,
         false,
         {from: deployer}
