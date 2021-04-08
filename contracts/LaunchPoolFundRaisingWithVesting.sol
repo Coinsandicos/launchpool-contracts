@@ -26,6 +26,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         uint256 pledgeFundingAmount; // Based on staked tokens, the funding that has come from the user (or not if they choose to pull out)
         uint256 rewardDebtRewards; // Reward debt. See explanation below.
         uint256 tokenAllocDebt;
+        uint256 checkpointedPercentageAllocation;
         //
         // We do some fancy math here. Basically, once vesting has started in a pool (if they have deposited), the amount of reward tokens
         // entitled to a user but is pending to be distributed is:
@@ -171,6 +172,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
         updatePool(_pid);
 
+        user.checkpointedPercentageAllocation = user.amount.mul(poolIdToAccPercentagePerShare[_pid]).div(1e18);
         user.amount = user.amount.add(_amount);
         user.tokenAllocDebt = user.amount.mul(poolIdToAccPercentagePerShare[_pid]).div(1e18);
 
@@ -188,7 +190,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
         (uint256 accPercentPerShare,) = getAccPercentagePerShareAndLastAllocBlock(_pid);
 
-        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18).sub(user.tokenAllocDebt);
+        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18).add(user.checkpointedPercentageAllocation).sub(user.tokenAllocDebt);
         return userPercentageAllocated.mul(pool.targetRaise).div(TOTAL_TOKEN_ALLOCATION_POINTS);
     }
 
@@ -214,7 +216,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         poolIdToTotalRaised[_pid] = poolIdToTotalRaised[_pid].add(msg.value);
 
         (uint256 accPercentPerShare,) = getAccPercentagePerShareAndLastAllocBlock(_pid);
-        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18).sub(user.tokenAllocDebt);
+        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18).add(user.checkpointedPercentageAllocation).sub(user.tokenAllocDebt);
         poolIdToTotalFundedPercentageOfTargetRaise[_pid] = poolIdToTotalFundedPercentageOfTargetRaise[_pid].add(userPercentageAllocated);
 
         user.pledgeFundingAmount = msg.value; // ensures pledges can only be done once
@@ -280,7 +282,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         }
 
         (uint256 accPercentPerShare,) = getAccPercentagePerShareAndLastAllocBlock(_pid);
-        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18).sub(user.tokenAllocDebt);
+        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18).add(user.checkpointedPercentageAllocation).sub(user.tokenAllocDebt);
         return userPercentageAllocated.mul(accRewardPerShare).div(1e18).sub(user.rewardDebtRewards);
     }
 
@@ -371,7 +373,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         uint256 accRewardPerShare = poolIdToAccRewardPerShareVesting[_pid];
 
         (uint256 accPercentPerShare,) = getAccPercentagePerShareAndLastAllocBlock(_pid);
-        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18).sub(user.tokenAllocDebt);
+        uint256 userPercentageAllocated = user.amount.mul(accPercentPerShare).div(1e18).add(user.checkpointedPercentageAllocation).sub(user.tokenAllocDebt);
         uint256 pending = userPercentageAllocated.mul(accRewardPerShare).div(1e18).sub(user.rewardDebtRewards);
 
         if (pending > 0) {

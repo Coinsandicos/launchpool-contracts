@@ -1462,10 +1462,11 @@ contract('LaunchPoolFundRaisingWithVesting', ([
       it('Can claim the raised funds', async () => {
         const deployerBalanceTracker = await balance.tracker(deployer)
 
-        const {receipt} = await this.fundRaising.claimFundRaising(POOL_ZERO, {from: deployer})
+        await this.fundRaising.claimFundRaising(POOL_ZERO, {from: deployer})
 
         let {raised} = (await this.fundRaising.getTotalRaisedVsTarget(POOL_ZERO, {from: alice}))
-        expect(await deployerBalanceTracker.delta()).to.be.bignumber.equal(raised.sub(txFee(receipt)))
+
+        shouldBeNumberInEtherCloseTo(await deployerBalanceTracker.delta(), fromWei(raised))
       })
 
       it('Reverts when rewards have already been claimed', async () => {
