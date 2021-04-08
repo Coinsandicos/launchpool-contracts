@@ -173,8 +173,8 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         updatePool(_pid);
 
         user.checkpointedPercentageAllocation = user.amount.mul(poolIdToAccPercentagePerShare[_pid]).div(1e18);
+        user.tokenAllocDebt = user.checkpointedPercentageAllocation;
         user.amount = user.amount.add(_amount);
-        user.tokenAllocDebt = user.amount.mul(poolIdToAccPercentagePerShare[_pid]).div(1e18);
 
         poolIdToTotalStaked[_pid] = poolIdToTotalStaked[_pid].add(_amount);
 
