@@ -266,7 +266,7 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
 
         poolIdToRewardEndBlock[_pid] = _rewardEndBlock;
 
-        pool.rewardToken.transferFrom(msg.sender, address(rewardGuildBank), _rewardAmount);
+        pool.rewardToken.safeTransferFrom(msg.sender, address(rewardGuildBank), _rewardAmount);
 
         emit RewardsSetUp(_pid, _rewardAmount, _rewardEndBlock);
     }
@@ -407,12 +407,14 @@ contract LaunchPoolFundRaisingWithVesting is Ownable, ReentrancyGuard {
         require(user.pledgeFundingAmount == 0, "withdraw: Only allow non-funders to withdraw");
         require(block.number > pool.pledgeFundingEndBlock, "withdraw: Not yet permitted");
 
-        stakingToken.safeTransfer(msg.sender, user.amount);
+        uint256 withdrawAmount = user.amount;
 
-        // all sent
-        user.amount = 0;
+        // remove the record for this user
+        delete userInfo[_pid][msg.sender];
 
-        emit Withdraw(msg.sender, _pid, user.amount);
+        stakingToken.safeTransfer(msg.sender, withdrawAmount);
+
+        emit Withdraw(msg.sender, _pid, withdrawAmount);
     }
 
     function claimFundRaising(uint256 _pid) external nonReentrant {
