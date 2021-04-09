@@ -7,10 +7,10 @@ async function main() {
     await deployer.getAddress()
   );
 
-  const tokenAddress = prompt('Token address? '); // 0x6e51a92f2d131f595bd451f393b2a3a519c3ede7
-  const maxRewards = prompt('Max rewards? '); // 100000
-  const startBlock = prompt('Start block? '); // 12011195 - https://etherscan.io/block/countdown/12011195
-  const endBlock = prompt('End block? '); // 12023650 - https://etherscan.io/block/countdown/12023650
+  const tokenAddress = prompt('Token address? '); // 0xF94b5C5651c888d928439aB6514B93944eEE6F48 - Yield
+  const maxRewards = prompt('Max rewards? '); // 500000 - 500k
+  const startBlock = prompt('Start block? '); // 12043400 - https://etherscan.io/block/countdown/12043400
+  const endBlock = prompt('End block? '); // 12253000 - https://etherscan.io/block/countdown/12253000
 
   console.log('Token address', tokenAddress);
   console.log('Max rewards', maxRewards);
