@@ -20,7 +20,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
                                                 project1Admin,
                                                 project2Admin,
                                               ]) => {
-  const shouldBeNumberInEtherCloseTo = (valInWei, expected) => parseFloat(fromWei(valInWei)).should.be.closeTo(parseFloat(expected.toString()), 0.000001);
+  const shouldBeNumberInEtherCloseTo = (valInWei, expected) => parseFloat(fromWei(valInWei)).should.be.closeTo(parseFloat(expected.toString()), 0.001);
 
   const to18DP = (value) => {
     return new BN(value).mul(new BN('10').pow(new BN('18')));
