@@ -939,6 +939,80 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         await fundPledge(POOL_ZERO, bob)
       })
     })
+
+    describe('Single staker midway through cant get lost rewards', () => {
+      beforeEach(async () => {
+        this.currentBlock = await time.latestBlock();
+
+        // create reward token for fund raising
+        this.rewardToken1 = await MockERC20.new(
+          'Reward1',
+          'Reward1',
+          ONE_HUNDRED_THOUSAND_TOKENS,
+          {from: deployer}
+        )
+
+        this.stakingEndBlock = this.currentBlock.add(toBn('110'))
+        this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+        this.project1TargetRaise = ether('100')
+
+        const tokenAllocStartBlock = this.currentBlock.add(toBn('10'))
+        await this.fundRaising.add(
+          this.rewardToken1.address,
+          tokenAllocStartBlock,
+          this.stakingEndBlock,
+          this.pledgeFundingEndBlock,
+          this.project1TargetRaise,
+          TEN_MILLION_TOKENS,
+          false,
+          {from: deployer}
+        )
+      })
+
+      it('Staker only gets 50%', async () => {
+        // move to midway through staking
+        // as pledge will use 2 blocks, half way needs 2 taking away from 50
+        await time.advanceBlockTo(this.stakingEndBlock.sub(toBn('52')))
+
+        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice)
+
+        await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
+
+        const staking = this.fundRaising
+        let poolInfo = await this.fundRaising.poolInfo(POOL_ZERO)
+        let userInfo = await this.fundRaising.userInfo(POOL_ZERO, alice)
+        const tokenAllocationPeriodInBlocks = poolInfo.stakingEndBlock.sub(poolInfo.tokenAllocationStartBlock);
+
+        const TOTAL_TOKEN_ALLOCATION_POINTS = await staking.TOTAL_TOKEN_ALLOCATION_POINTS();
+        const allocationAvailablePerBlock = TOTAL_TOKEN_ALLOCATION_POINTS.div(tokenAllocationPeriodInBlocks);
+
+        let userPercentageAllocated = new BN('0')
+
+        let currentBlock = await time.latestBlock();
+        if (currentBlock.gte(poolInfo.tokenAllocationStartBlock)) {
+
+          const maxEndBlockForPercentAlloc = currentBlock.lte(poolInfo.stakingEndBlock) ? currentBlock : poolInfo.stakingEndBlock;
+
+          const poolIdToLastPercentageAllocBlock = await staking.poolIdToLastPercentageAllocBlock(POOL_ZERO)
+          const multiplier = maxEndBlockForPercentAlloc.sub(poolIdToLastPercentageAllocBlock);
+
+          const totalPercentageUnlocked = multiplier.mul(allocationAvailablePerBlock);
+
+          let poolIdToAccPercentagePerShare = await staking.poolIdToAccPercentagePerShare(POOL_ZERO)
+          const poolIdToTotalStaked = await staking.poolIdToTotalStaked(POOL_ZERO)
+          poolIdToAccPercentagePerShare = poolIdToTotalStaked.gt(new BN('0')) ? poolIdToAccPercentagePerShare.add(totalPercentageUnlocked.mul(new BN('1000000000000000000')).div(poolIdToTotalStaked)) : poolIdToAccPercentagePerShare
+
+          userPercentageAllocated = userInfo.amount.mul(poolIdToAccPercentagePerShare).div(new BN('1000000000000000000')).sub(userInfo.tokenAllocDebt)
+        }
+
+        shouldBeNumberInEtherCloseTo(
+          userPercentageAllocated,
+          fromWei(TOTAL_TOKEN_ALLOCATION_POINTS.divn(2))
+        )
+
+        await fundPledge(POOL_ZERO, alice)
+      })
+    })
   })
 
   describe.only('add()', () => {
