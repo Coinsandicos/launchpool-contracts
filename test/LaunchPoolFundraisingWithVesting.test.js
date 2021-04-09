@@ -52,6 +52,8 @@ contract('LaunchPoolFundRaisingWithVesting', ([
   const pledge = async (poolId, amount, sender) => {
     const totalStakedBefore = await this.fundRaising.poolIdToTotalStaked(poolId)
 
+    const userInfoBefore = await this.fundRaising.userInfo(poolId, sender)
+
     await this.launchPoolToken.approve(this.fundRaising.address, amount, {from: sender})
     const {receipt} = await this.fundRaising.pledge(poolId, amount, {from: sender})
 
@@ -62,7 +64,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
 
     const {amount: pledgedAmount} = await this.fundRaising.userInfo(poolId, sender)
-    expect(pledgedAmount).to.be.bignumber.equal(amount)
+    expect(pledgedAmount).to.be.bignumber.equal(amount.add(userInfoBefore.amount))
 
     const totalStakedAfter = await this.fundRaising.poolIdToTotalStaked(poolId)
     expect(totalStakedAfter.sub(totalStakedBefore)).to.be.bignumber.equal(amount)
@@ -181,7 +183,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         )
       })
 
-      it.only('Can farm reward tokens once all stages have passed', async () => {
+      it('Can farm reward tokens once all stages have passed', async () => {
         // let alice and bob pledge funding by staking LPOOL
         await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, alice) // Alice will have to fund 2/3 of the target raise
         await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS.divn(2), bob) // Bob will have to fund 1/3
@@ -248,7 +250,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           'Reward1',
           'Reward1',
           ONE_HUNDRED_THOUSAND_TOKENS,
-          {from: project1Admin}
+          {from: deployer}
         )
 
         this.stakingEndBlock = this.currentBlock.add(toBn('100'))
@@ -289,7 +291,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
-          project1Admin
+          deployer
         )
 
         // rewards will come through after a few blocks
@@ -308,7 +310,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           'Reward2',
           'Reward2',
           ONE_HUNDRED_THOUSAND_TOKENS,
-          {from: project2Admin}
+          {from: deployer}
         )
 
         this.currentBlock = await time.latestBlock();
@@ -354,7 +356,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
-          project2Admin
+          deployer
         )
 
         // rewards will come through after a few blocks
@@ -414,11 +416,11 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           'Reward1',
           'Reward1',
           ONE_HUNDRED_THOUSAND_TOKENS.muln(2),
-          {from: project1Admin}
+          {from: deployer}
         )
 
         // send project admin 2 100k tokens from token 1
-        await this.rewardToken1.transfer(project2Admin, ONE_HUNDRED_THOUSAND_TOKENS, {from: project1Admin})
+        await this.rewardToken1.transfer(deployer, ONE_HUNDRED_THOUSAND_TOKENS, {from: deployer})
 
         this.stakingEndBlock = this.currentBlock.add(toBn('100'))
         this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
@@ -458,7 +460,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
-          project1Admin
+          deployer
         )
 
         // rewards will come through after a few blocks
@@ -516,7 +518,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
-          project2Admin
+          deployer
         )
 
         // rewards will come through after a few blocks
@@ -576,11 +578,11 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           'Reward1',
           'Reward1',
           ONE_HUNDRED_THOUSAND_TOKENS.muln(2),
-          {from: project1Admin}
+          {from: deployer}
         )
 
         // send project admin 2 100k tokens from token 1
-        await this.rewardToken1.transfer(project2Admin, ONE_HUNDRED_THOUSAND_TOKENS, {from: project1Admin})
+        await this.rewardToken1.transfer(deployer, ONE_HUNDRED_THOUSAND_TOKENS, {from: deployer})
 
         this.stakingEndBlock = this.currentBlock.add(toBn('100'))
         this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
@@ -621,7 +623,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('5')),
           project1RewardEndBlock, // 1k tokens a block
-          project1Admin
+          deployer
         )
 
         // rewards will come through after a few blocks
@@ -687,7 +689,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
-          project2Admin
+          deployer
         )
 
         // rewards will come through after a few blocks
@@ -744,7 +746,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           'Reward1',
           'Reward1',
           ONE_HUNDRED_THOUSAND_TOKENS,
-          {from: project1Admin}
+          {from: deployer}
         )
 
         this.stakingEndBlock = this.currentBlock.add(toBn('110'))
@@ -799,7 +801,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('5')),
           _1BlockPastFundingEndBlock.add(toBn('105')), // 1k tokens a block
-          project1Admin
+          deployer
         )
 
         // rewards will come through after a few blocks
@@ -828,6 +830,113 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         const bobRewardTokenBalAfterClaim = await this.rewardToken1.balanceOf(bob)
 
         shouldBeNumberInEtherCloseTo(bobRewardTokenBalAfterClaim, fromWei(totalRewardsBob))
+      })
+    })
+
+    describe('Increasing stake midway through', () => {
+      beforeEach(async () => {
+        this.currentBlock = await time.latestBlock();
+
+        // create reward token for fund raising
+        this.rewardToken1 = await MockERC20.new(
+          'Reward1',
+          'Reward1',
+          ONE_HUNDRED_THOUSAND_TOKENS,
+          {from: deployer}
+        )
+
+        this.stakingEndBlock = this.currentBlock.add(toBn('110'))
+        this.pledgeFundingEndBlock = this.stakingEndBlock.add(toBn('50'))
+        this.project1TargetRaise = ether('100')
+
+        const tokenAllocStartBlock = this.currentBlock.add(toBn('10'))
+        await this.fundRaising.add(
+          this.rewardToken1.address,
+          tokenAllocStartBlock,
+          this.stakingEndBlock,
+          this.pledgeFundingEndBlock,
+          this.project1TargetRaise,
+          TEN_MILLION_TOKENS,
+          false,
+          {from: deployer}
+        )
+      })
+
+      it('Can farm reward tokens once all stages have passed', async () => {
+        // let alice and bob pledge funding by staking LPOOL
+        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS.divn(2), alice) // Alice will have to fund 1/2 of the target raise
+        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS, bob) // Bob will have to fund 1/2
+
+        // move to midway through staking
+        await time.advanceBlockTo(this.stakingEndBlock.sub(toBn('50')))
+
+        const staking = this.fundRaising
+        let poolInfo = await this.fundRaising.poolInfo(POOL_ZERO)
+        let userInfo = await this.fundRaising.userInfo(POOL_ZERO, alice)
+        const tokenAllocationPeriodInBlocks = poolInfo.stakingEndBlock.sub(poolInfo.tokenAllocationStartBlock);
+
+        const TOTAL_TOKEN_ALLOCATION_POINTS = await staking.TOTAL_TOKEN_ALLOCATION_POINTS();
+        const allocationAvailablePerBlock = TOTAL_TOKEN_ALLOCATION_POINTS.div(tokenAllocationPeriodInBlocks);
+
+        let userPercentageAllocated = new BN('0')
+
+        let currentBlock = await time.latestBlock();
+        if (currentBlock.gte(poolInfo.tokenAllocationStartBlock)) {
+
+          const maxEndBlockForPercentAlloc = currentBlock.lte(poolInfo.stakingEndBlock) ? currentBlock : poolInfo.stakingEndBlock;
+
+          const poolIdToLastPercentageAllocBlock = await staking.poolIdToLastPercentageAllocBlock(POOL_ZERO)
+          const multiplier = maxEndBlockForPercentAlloc.sub(poolIdToLastPercentageAllocBlock);
+
+          const totalPercentageUnlocked = multiplier.mul(allocationAvailablePerBlock);
+
+          let poolIdToAccPercentagePerShare = await staking.poolIdToAccPercentagePerShare(POOL_ZERO)
+          const poolIdToTotalStaked = await staking.poolIdToTotalStaked(POOL_ZERO)
+          poolIdToAccPercentagePerShare = poolIdToTotalStaked.gt(new BN('0')) ? poolIdToAccPercentagePerShare.add(totalPercentageUnlocked.mul(new BN('1000000000000000000')).div(poolIdToTotalStaked)) : poolIdToAccPercentagePerShare
+
+          userPercentageAllocated = userInfo.amount.mul(poolIdToAccPercentagePerShare).div(new BN('1000000000000000000')).sub(userInfo.tokenAllocDebt)
+        }
+
+        shouldBeNumberInEtherCloseTo(
+          userPercentageAllocated,
+          fromWei(TOTAL_TOKEN_ALLOCATION_POINTS.divn(2).divn(3))
+        )
+
+        await pledge(POOL_ZERO, ONE_THOUSAND_TOKENS.divn(2), alice)
+
+        await time.advanceBlockTo(this.stakingEndBlock.add(toBn('1')))
+
+        poolInfo = await this.fundRaising.poolInfo(POOL_ZERO)
+        userInfo = await this.fundRaising.userInfo(POOL_ZERO, alice)
+
+        currentBlock = await time.latestBlock();
+        if (currentBlock.gte(poolInfo.tokenAllocationStartBlock)) {
+
+          const maxEndBlockForPercentAlloc = currentBlock.lte(poolInfo.stakingEndBlock) ? currentBlock : poolInfo.stakingEndBlock;
+
+          const poolIdToLastPercentageAllocBlock = await staking.poolIdToLastPercentageAllocBlock(POOL_ZERO)
+          const multiplier = maxEndBlockForPercentAlloc.sub(poolIdToLastPercentageAllocBlock);
+
+          const totalPercentageUnlocked = multiplier.mul(allocationAvailablePerBlock);
+
+          let poolIdToAccPercentagePerShare = await staking.poolIdToAccPercentagePerShare(POOL_ZERO)
+          const poolIdToTotalStaked = await staking.poolIdToTotalStaked(POOL_ZERO)
+          poolIdToAccPercentagePerShare = poolIdToTotalStaked.gt(new BN('0')) ? poolIdToAccPercentagePerShare.add(totalPercentageUnlocked.mul(new BN('1000000000000000000')).div(poolIdToTotalStaked)) : poolIdToAccPercentagePerShare
+
+          userPercentageAllocated = userInfo.amount.mul(poolIdToAccPercentagePerShare).div(new BN('1000000000000000000')).sub(userInfo.tokenAllocDebt)
+        }
+
+        shouldBeNumberInEtherCloseTo(
+          userPercentageAllocated,
+          fromWei(
+            TOTAL_TOKEN_ALLOCATION_POINTS.divn(2).divn(3)
+              .add(to18DP('25')).sub(TOTAL_TOKEN_ALLOCATION_POINTS.divn(2).divn(3).divn(50))
+          )
+          // 1/3 of 50% (stake from first 50 blocks) plus 1/2 of 50% for the next 50 blocks minus the block mined where stake was still 1/3
+        )
+
+        await fundPledge(POOL_ZERO, alice)
+        await fundPledge(POOL_ZERO, bob)
       })
     })
   })
@@ -908,7 +1017,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         'Reward1',
         'Reward1',
         ONE_HUNDRED_THOUSAND_TOKENS,
-        {from: project1Admin}
+        {from: deployer}
       )
 
       this.stakingEndBlock = this.currentBlock.add(toBn('100'))
@@ -938,7 +1047,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         'Reward1',
         'Reward1',
         ONE_HUNDRED_THOUSAND_TOKENS,
-        {from: project1Admin}
+        {from: deployer}
       )
 
       this.stakingEndBlock = this.currentBlock.add(toBn('100'))
@@ -971,7 +1080,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         'Reward1',
         'Reward1',
         ONE_HUNDRED_THOUSAND_TOKENS,
-        {from: project1Admin}
+        {from: deployer}
       )
 
       this.stakingEndBlock = this.currentBlock.add(toBn('100'))
@@ -1019,7 +1128,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         'Reward1',
         'Reward1',
         ONE_HUNDRED_THOUSAND_TOKENS,
-        {from: project1Admin}
+        {from: deployer}
       )
 
       this.stakingEndBlock = this.currentBlock.add(toBn('100'))
@@ -1056,7 +1165,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         'Reward1',
         'Reward1',
         ONE_HUNDRED_THOUSAND_TOKENS,
-        {from: project1Admin}
+        {from: deployer}
       )
 
       this.stakingEndBlock = this.currentBlock.add(toBn('100'))
@@ -1086,7 +1195,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         'Reward1',
         'Reward1',
         ONE_HUNDRED_THOUSAND_TOKENS,
-        {from: project1Admin}
+        {from: deployer}
       )
 
       this.stakingEndBlock = this.currentBlock.add(toBn('100'))
@@ -1118,7 +1227,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         'Reward1',
         'Reward1',
         ONE_HUNDRED_THOUSAND_TOKENS,
-        {from: project1Admin}
+        {from: deployer}
       )
 
       this.stakingEndBlock = this.currentBlock.add(toBn('100'))
@@ -1152,7 +1261,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         'Reward1',
         'Reward1',
         ONE_HUNDRED_THOUSAND_TOKENS,
-        {from: project1Admin}
+        {from: deployer}
       )
 
       this.stakingEndBlock = this.currentBlock.add(toBn('100'))
@@ -1196,7 +1305,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
           'Reward1',
           'Reward1',
           ONE_HUNDRED_THOUSAND_TOKENS,
-          {from: project1Admin}
+          {from: deployer}
         )
 
         this.stakingEndBlock = this.currentBlock.add(toBn('100'))
@@ -1280,7 +1389,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         'Reward1',
         'Reward1',
         ONE_HUNDRED_THOUSAND_TOKENS,
-        {from: project1Admin}
+        {from: deployer}
       )
 
       this.stakingEndBlock = this.currentBlock.add(toBn('100'))
@@ -1502,7 +1611,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
         'Reward1',
         'Reward1',
         ONE_HUNDRED_THOUSAND_TOKENS,
-        {from: project1Admin}
+        {from: deployer}
       )
 
       this.stakingEndBlock = this.currentBlock.add(toBn('100'))
