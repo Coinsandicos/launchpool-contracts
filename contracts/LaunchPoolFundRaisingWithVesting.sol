@@ -10,8 +10,6 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 
 import { FundRaisingGuild } from "./FundRaisingGuild.sol";
 
-import "hardhat/console.sol";
-
 /// @title Fund raising platform facilitated by launch pool
 /// @author BlockRocket.tech
 /// @notice Fork of MasterChef.sol from SushiSwap
