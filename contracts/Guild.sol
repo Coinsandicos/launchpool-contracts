@@ -3,8 +3,11 @@
 pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 contract Guild {
+    using SafeERC20 for IERC20;
+
     IERC20 public token;
 
     address public stakingContract;
@@ -16,7 +19,7 @@ contract Guild {
 
     function withdrawTo(address _recipient, uint256 _amount) external {
         require(msg.sender == stakingContract, "Guild.withdrawTo: Only staking contract");
-        require(token.transfer(_recipient, _amount), "Guild.withdrawTo: Transfer failed");
+        token.safeTransfer(_recipient, _amount);
     }
 
     function tokenBalance() external returns (uint256) {
