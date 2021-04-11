@@ -154,7 +154,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     )
   })
 
-  describe.only('Fund raising end to end flow', () => {
+  describe('Fund raising end to end flow', () => {
     describe('With 1 pool set up', () => {
       beforeEach(async () => {
         this.currentBlock = await time.latestBlock();
@@ -1015,7 +1015,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.only('add()', () => {
+  describe('add()', () => {
     it('Reverts when reward token is zero address', async () => {
       await expectRevert(
         this.fundRaising.add(
@@ -1077,7 +1077,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.only('pledge()', () => {
+  describe('pledge()', () => {
     it('Reverts when invalid PID', async () => {
       await expectRevert(
         this.fundRaising.pledge('99', '1'),
@@ -1179,7 +1179,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.only('getPledgeFundingAmount()', () => {
+  describe('getPledgeFundingAmount()', () => {
     it('Reverts when pid is invalid', async () => {
       await expectRevert(
         this.fundRaising.getPledgeFundingAmount('9999'),
@@ -1188,7 +1188,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.only('fundPledge()', () => {
+  describe('fundPledge()', () => {
     it('Reverts when invalid PID', async () => {
       await expectRevert(
         this.fundRaising.fundPledge('99'),
@@ -1362,7 +1362,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.only('setupVestingRewards()', () => {
+  describe('setupVestingRewards()', () => {
     it('Reverts when invalid PID', async () => {
       await expectRevert(
         this.fundRaising.setupVestingRewards('999', '2', '3', '4', '5'),
@@ -1457,7 +1457,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.only('pendingRewards()', () => {
+  describe('pendingRewards()', () => {
     it('Returns zero when user has not funded a pledge', async () => {
       this.rewardToken1 = await MockERC20.new(
         'Reward1',
@@ -1486,7 +1486,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.only('claimReward()', () => {
+  describe('claimReward()', () => {
     beforeEach(async () => {
       this.rewardToken1 = await MockERC20.new(
         'Reward1',
@@ -1580,7 +1580,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.only('claimFundRaising()', () => {
+  describe('claimFundRaising()', () => {
     describe('When a project is fully funded', () => {
       beforeEach(async () => {
         // set up and fully fund a project
@@ -1676,7 +1676,7 @@ contract('LaunchPoolFundRaisingWithVesting', ([
     })
   })
 
-  describe.only('withdraw', () => {
+  describe('withdraw', () => {
     beforeEach(async () => {
       this.currentBlock = await time.latestBlock();
 
