@@ -10,22 +10,24 @@ async function main() {
     deployerAddress
   );
 
-  const stakingAddress = prompt('Staking address? ');
+  const fundRaisingAddress = prompt('Fund raising contract address (Phase 2)? ');
 
-  console.log('Staking', stakingAddress);
+  console.log('Phase 2 contract address', fundRaisingAddress);
+
+  prompt('\nIf happy, hit enter...\n');
 
   const staking = new ethers.Contract(
-    stakingAddress,
+    fundRaisingAddress,
     LaunchPoolFundRaisingWithVestingMetadata.abi,
     deployer //provider
   );
 
   const projects = [
     [
-      ['0xc52c326331e9ce41f04484d3b5e5648158028804', '12230800', '12244300', '12251050', ethers.utils.parseEther('16.666667'), '50'], // 50 limit
-      ['0xc52c326331e9ce41f04484d3b5e5648158028804', '12230800', '12244300', '12251050', ethers.utils.parseEther('16.666667'), '250'], // 250 limit
-      ['0xc52c326331e9ce41f04484d3b5e5648158028804', '12230800', '12244300', '12251050', ethers.utils.parseEther('16.666667'), '10000000'] // No limit
-    ], // Unizen - Raising 50 ETH split 3 ways in 3 pools. 16.666667 * 3 = 50.000001 ETH
+      ['TODO Reward token', '12250400', '12276800', '12283400', ethers.utils.parseEther('83.333337'), '50'], // 50 limit
+      ['TODO Reward token', '12250400', '12276800', '12283400', ethers.utils.parseEther('83.333337'), '250'], // 250 limit
+      ['TODO Reward token', '12250400', '12276800', '12283400', ethers.utils.parseEther('83.333337'), '10000000'] // No limit
+    ], // Mixsome - Raising 250 ETH divided 3 ways. 83.333337 * 3 = 250.000011 ETH
   ];
 
   console.log(`Adding 3 pools for ${projects.length} projects`);
