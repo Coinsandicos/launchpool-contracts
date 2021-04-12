@@ -22,15 +22,10 @@ async function main() {
 
   const projects = [
     [
-      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8371000', '8371125', '8371250', ethers.utils.parseEther('1'), deployerAddress, '50'],
-      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8371000', '8371125', '8371250', ethers.utils.parseEther('1'), deployerAddress, '250'],
-      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8371000', '8371125', '8371250', ethers.utils.parseEther('1'), deployerAddress, '10000000']
-    ], // mixsome
-    [
-      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8371125', '8371250', '8371375', ethers.utils.parseEther('1'), deployerAddress, '50'],
-      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8371125', '8371250', '8371375', ethers.utils.parseEther('1'), deployerAddress, '250'],
-      ['0x8370454ee905f2328ca80dbb955b567c417d0d63', '8371125', '8371250', '8371375', ethers.utils.parseEther('1'), deployerAddress, '10000000']
-    ], // unizen
+      ['0xc52c326331e9ce41f04484d3b5e5648158028804', '12230800', '12244300', '12251050', ethers.utils.parseEther('16.666667'), '50'], // 50 limit
+      ['0xc52c326331e9ce41f04484d3b5e5648158028804', '12230800', '12244300', '12251050', ethers.utils.parseEther('16.666667'), '250'], // 250 limit
+      ['0xc52c326331e9ce41f04484d3b5e5648158028804', '12230800', '12244300', '12251050', ethers.utils.parseEther('16.666667'), '10000000'] // No limit
+    ], // Unizen - Raising 50 ETH split 3 ways in 3 pools. 16.666667 * 3 = 50.000001 ETH
   ];
 
   console.log(`Adding 3 pools for ${projects.length} projects`);
@@ -45,7 +40,6 @@ async function main() {
         stakingEndBlock,
         pledgeFundingEndBlock,
         targetRaise,
-        fundRaisingRecipient,
         maxStakingPerUser
       ] = projectPools[y]
 
@@ -57,7 +51,6 @@ async function main() {
         stakingEndBlock,
         pledgeFundingEndBlock,
         targetRaise,
-        fundRaisingRecipient,
         ethers.utils.parseEther(maxStakingPerUser.toString()),
         false
       );

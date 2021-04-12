@@ -7,7 +7,7 @@ async function main() {
     await deployer.getAddress()
   );
 
-  const tokenAddress = prompt('Staking token address? ');
+  const tokenAddress = prompt('Staking token address? '); // 0x6149C26Cd2f7b5CCdb32029aF817123F6E37Df5B == LPOOL Mainnet
 
   console.log('Staking token address', tokenAddress);
 
