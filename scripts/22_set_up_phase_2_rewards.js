@@ -1,6 +1,6 @@
 const prompt = require('prompt-sync')();
 
-const LaunchPoolStakingMetadata = require('../artifacts/contracts/LaunchPoolFundRaisingWithVesting.sol/LaunchPoolFundRaisingWithVesting.json');
+const LaunchPoolFundRaisingWithVestingABI = require('../artifacts/contracts/LaunchPoolFundRaisingWithVesting.sol/LaunchPoolFundRaisingWithVesting.json').abi;
 const ERC20Metadata = require('../artifacts/contracts/StakingERC20.sol/StakingERC20.json');
 
 async function main() {
@@ -11,32 +11,52 @@ async function main() {
     deployerAddress
   );
 
-  const stakingAddress = prompt('Staking address? ');
+  const fundRaisingAddress = prompt('Fund raising contract address (Phase 2)? ');
+  const rewardTokenAddress = prompt('Reward Token address? ');
 
-  console.log('Staking', stakingAddress);
+  console.log('\nFund raising contract address', fundRaisingAddress);
+  console.log('Reward token contract address', rewardTokenAddress);
 
-  const staking = new ethers.Contract(
-    stakingAddress,
-    LaunchPoolStakingMetadata.abi,
-    deployer //provider
+  prompt('\nIf happy, hit enter...\n');
+
+  const fundRaising = new ethers.Contract(
+    fundRaisingAddress,
+    LaunchPoolFundRaisingWithVestingABI,
+    deployer // provider
   );
 
-  const lpool = new ethers.Contract(
-    '0x8370454ee905f2328ca80dbb955b567c417d0d63',
+  const rewardToken = new ethers.Contract(
+    rewardTokenAddress,
     ERC20Metadata.abi,
     deployer
   )
 
-  const tx = await lpool.approve(staking.address, ethers.constants.MaxUint256)
+  const tx = await rewardToken.approve(fundRaising.address, ethers.constants.MaxUint256)
   await tx.wait()
 
+  // Script prepped for Unizen pools
   const rewardInfo = [
-    ['105', '10000', '8371375', '8371500', '8371625'],
-    ['106', '10000', '8371375', '8371500', '8371625'],
-    ['107', '10000', '8371375', '8371500', '8371625'], // last pool for mixsome
-    ['108', '10000', '8371500', '8371625', '8371750'],
-    ['109', '10000', '8371500', '8371625', '8371750'],
-    ['110', '10000', '8371500', '8371625', '8371750'],
+    [
+      '0', // Pool ID
+      '1111111', // Total rewards
+      'TODO', // reward start block
+      'TODO', // reward cliff block
+      'TODO' // reward end block
+    ], // Pool 0
+    [
+      '1', // Pool ID
+      '1111111', // Total rewards
+      'TODO', // reward start block
+      'TODO', // reward cliff block
+      'TODO' // reward end block
+    ], // Pool 1
+    [
+      '2', // Pool ID
+      '1111111', // Total rewards
+      'TODO', // reward start block
+      'TODO', // reward cliff block
+      'TODO' // reward end block
+    ], // Pool 2
   ];
 
   console.log(`Setting up rewards for ${rewardInfo.length} pools`);
