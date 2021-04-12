@@ -22,9 +22,9 @@ async function main() {
 
   const projects = [
     [
-      ['0xc52c326331e9ce41f04484d3b5e5648158028804', '12230550', '12243650', '12250200', ethers.utils.parseEther('16.666667'), '50'], // 50 limit
-      ['0xc52c326331e9ce41f04484d3b5e5648158028804', '12230550', '12243650', '12250200', ethers.utils.parseEther('16.666667'), '250'], // 250 limit
-      ['0xc52c326331e9ce41f04484d3b5e5648158028804', '12230550', '12243650', '12250200', ethers.utils.parseEther('16.666667'), '10000000'] // No limit
+      ['0xc52c326331e9ce41f04484d3b5e5648158028804', '12230800', '12244300', '12251050', ethers.utils.parseEther('16.666667'), '50'], // 50 limit
+      ['0xc52c326331e9ce41f04484d3b5e5648158028804', '12230800', '12244300', '12251050', ethers.utils.parseEther('16.666667'), '250'], // 250 limit
+      ['0xc52c326331e9ce41f04484d3b5e5648158028804', '12230800', '12244300', '12251050', ethers.utils.parseEther('16.666667'), '10000000'] // No limit
     ], // Unizen - Raising 50 ETH split 3 ways in 3 pools. 16.666667 * 3 = 50.000001 ETH
   ];
 
