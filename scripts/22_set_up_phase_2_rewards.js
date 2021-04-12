@@ -5,7 +5,7 @@ const ERC20Metadata = require('../artifacts/contracts/StakingERC20.sol/StakingER
 
 async function main() {
   const [deployer] = await ethers.getSigners();
-  const deployerAddress = await deployer.getAddress()
+  const deployerAddress = await deployer.getAddress();
   console.log(
     "Setting up rewards for pools with the account:",
     deployerAddress
@@ -25,10 +25,10 @@ async function main() {
     '0x8370454ee905f2328ca80dbb955b567c417d0d63',
     ERC20Metadata.abi,
     deployer
-  )
+  );
 
-  const tx = await lpool.approve(staking.address, ethers.constants.MaxUint256)
-  await tx.wait()
+  const tx = await lpool.approve(staking.address, ethers.constants.MaxUint256);
+  await tx.wait();
 
   const rewardInfo = [
     ['105', '10000', '8371375', '8371500', '8371625'],
@@ -48,7 +48,7 @@ async function main() {
       rewardStartBlock,
       rewardCliffEnd,
       rewardEndBlock
-    ] = rewardInfo[y]
+    ] = rewardInfo[y];
 
     await staking.setupVestingRewards(
       pid,
