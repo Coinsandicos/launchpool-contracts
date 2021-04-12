@@ -1,6 +1,6 @@
 const prompt = require('prompt-sync')();
 
-const LaunchPoolStakingMetadata = require('../artifacts/contracts/LaunchPoolFundRaisingWithVesting.sol/LaunchPoolFundRaisingWithVesting.json');
+const LaunchPoolFundRaisingWithVestingMetadata = require('../artifacts/contracts/LaunchPoolFundRaisingWithVesting.sol/LaunchPoolFundRaisingWithVesting.json');
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -16,7 +16,7 @@ async function main() {
 
   const staking = new ethers.Contract(
     stakingAddress,
-    LaunchPoolStakingMetadata.abi,
+    LaunchPoolFundRaisingWithVestingMetadata.abi,
     deployer //provider
   );
 
