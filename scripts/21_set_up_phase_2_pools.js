@@ -24,9 +24,9 @@ async function main() {
 
   const projects = [
     [
-      ['TODO Reward token', '12250400', '12276800', '12283400', ethers.utils.parseEther('83.333337'), '50'], // 50 limit
-      ['TODO Reward token', '12250400', '12276800', '12283400', ethers.utils.parseEther('83.333337'), '250'], // 250 limit
-      ['TODO Reward token', '12250400', '12276800', '12283400', ethers.utils.parseEther('83.333337'), '10000000'] // No limit
+      ['0x89bfe33A7969E28C411A7fcB3b26F4AcdF7EA80d', '12251450', '12275950', '12282450', ethers.utils.parseEther('83.333337'), '50'], // 50 limit
+      ['0x89bfe33A7969E28C411A7fcB3b26F4AcdF7EA80d', '12251450', '12275950', '12282450', ethers.utils.parseEther('83.333337'), '250'], // 250 limit
+      ['0x89bfe33A7969E28C411A7fcB3b26F4AcdF7EA80d', '12251450', '12275950', '12282450', ethers.utils.parseEther('83.333337'), '10000000'] // No limit
     ], // Mixsome - Raising 250 ETH divided 3 ways. 83.333337 * 3 = 250.000011 ETH
   ];
 
