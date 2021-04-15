@@ -7,7 +7,8 @@ require('@nomiclabs/hardhat-solhint');
 require("@nomiclabs/hardhat-etherscan");
 
 const INFURA_PROJECT_ID = process.env.INFURA_PROJECT_ID;
-const PRIVATE_KEY = process.env.PRIVATE_KEY;
+const PRIVATE_KEY = process.env.LAUNCH_POOL_PRIVATE_KEY;
+const PRIVATE_TEST_KEY = process.env.PRIVATE_KEY;
 
 let nonDevelopmentNetworks = {}
 
@@ -15,24 +16,18 @@ let nonDevelopmentNetworks = {}
 if (PRIVATE_KEY) {
   nonDevelopmentNetworks = {
     mainnet: {
+      gasPrice: 130000000000, // 13o gwei
       url: `https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}`,
-        accounts: [`0x${PRIVATE_KEY}`]
-    },
-    ropsten: {
-      url: `https://ropsten.infura.io/v3/${INFURA_PROJECT_ID}`,
-        accounts: [`0x${PRIVATE_KEY}`]
+      accounts: [`${PRIVATE_KEY}`]
     },
     rinkeby: {
       url: `https://rinkeby.infura.io/v3/${INFURA_PROJECT_ID}`,
-        accounts: [`0x${PRIVATE_KEY}`]
+      accounts: [`0x${PRIVATE_TEST_KEY}`],
+      gasPrice: 130000000000, // 13o gwei
     },
-    kovan: {
-      url: `https://kovan.infura.io/v3/${INFURA_PROJECT_ID}`,
-        accounts: [`0x${PRIVATE_KEY}`]
-    },
-    sokol: {
-      url: `https://sokol.poa.network`,
-      accounts: [`0x${PRIVATE_KEY}`]
+    testnetbsc: {
+      url: `https://data-seed-prebsc-1-s1.binance.org:8545/`,
+      accounts: [`${PRIVATE_KEY}`]
     }
   }
 }

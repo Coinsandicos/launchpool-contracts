@@ -7,10 +7,10 @@ async function main() {
     await deployer.getAddress()
   );
 
-  const tokenAddress = prompt('Token address? '); // 0xF94b5C5651c888d928439aB6514B93944eEE6F48 - Yield
+  const tokenAddress = prompt('Token address? '); // 0x7Fd01d2E3abe55A1a7234495A4Bc65911034BFc0
   const maxRewards = prompt('Max rewards? '); // 500000 - 500k
-  const startBlock = prompt('Start block? '); // 12043400 - https://etherscan.io/block/countdown/12043400
-  const endBlock = prompt('End block? '); // 12253000 - https://etherscan.io/block/countdown/12253000
+  const startBlock = prompt('Start block? '); // 7997850
+  const endBlock = prompt('End block? '); // 8050500
 
   console.log('Token address', tokenAddress);
   console.log('Max rewards', maxRewards);
@@ -31,6 +31,8 @@ async function main() {
   await staking.deployed();
 
   console.log('Staking deployed at', staking.address);
+
+  console.log('Guild bank', await staking.rewardGuildBank())
 
   console.log('Finished!');
 }

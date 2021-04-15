@@ -1,7 +1,6 @@
 const prompt = require('prompt-sync')();
 
-const LaunchPoolStakingMetadata = require('../artifacts/LaunchPoolStakingWithGuild.json');
-const ERC20Metadata = require('../artifacts/StakingERC20.json');
+const LaunchPoolStakingMetadata = require('../artifacts/contracts/LaunchPoolStakingWithGuild.sol/LaunchPoolStakingWithGuild.json');
 
 async function main() {
   const [deployer] = await ethers.getSigners();
@@ -20,10 +19,8 @@ async function main() {
     deployer //provider
   );
 
-  // 0x6149c26cd2f7b5ccdb32029af817123f6e37df5b
-
   const pools = [
-    [100, '0x6149C26Cd2f7b5CCdb32029aF817123F6E37Df5B', 10000000], // $LPOOL
+    [100, '0x7Fd01d2E3abe55A1a7234495A4Bc65911034BFc0', 10000000], // $LPOOL
   ];
 
   console.log(`Adding ${pools.length} pools`);
@@ -31,20 +28,12 @@ async function main() {
   for (let x = 0; x < pools.length; x++) {
     const [allocPoint, tokenAddress, maxStakingPerUser] = pools[x]
 
-    const token = new ethers.Contract(
-      tokenAddress,
-      ERC20Metadata.abi,
-      deployer //provider
-    );
-
-    const decimals = await token.decimals()
-
     prompt(`Adding pool ${x + 1} with data {${allocPoint}-${tokenAddress}-${maxStakingPerUser}} - hit enter to continue`);
 
     await staking.add(
       allocPoint.toString(),
       tokenAddress,
-      ethers.utils.parseUnits(maxStakingPerUser.toString(), decimals),
+      ethers.utils.parseEther(maxStakingPerUser.toString()),
       false
     );
 
