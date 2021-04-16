@@ -16,7 +16,7 @@ let nonDevelopmentNetworks = {}
 if (PRIVATE_KEY) {
   nonDevelopmentNetworks = {
     mainnet: {
-      gasPrice: 130000000000, // 13o gwei
+      gasPrice: 250000000000, // 250 gwei
       url: `https://mainnet.infura.io/v3/${INFURA_PROJECT_ID}`,
       accounts: [`${PRIVATE_KEY}`]
     },

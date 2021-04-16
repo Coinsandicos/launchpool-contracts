@@ -43,22 +43,22 @@ async function main() {
     [
       '0', // Pool ID
       '1111111', // Total rewards
-      '12251175', // reward start block
-      '12251175', // reward cliff block
+      '12251225', // reward start block
+      '12251225', // reward cliff block
       '13421050' // reward end block
     ], // Pool 0
     [
       '1', // Pool ID
       '1111111', // Total rewards
-      '12251175', // reward start block
-      '12251175', // reward cliff block
+      '12251225', // reward start block
+      '12251225', // reward cliff block
       '13421050' // reward end block
     ], // Pool 1
     [
       '2', // Pool ID
       '1111111', // Total rewards
-      '12251175', // reward start block
-      '12251175', // reward cliff block
+      '12251225', // reward start block
+      '12251225', // reward cliff block
       '13421050' // reward end block
     ], // Pool 2
   ];
@@ -78,7 +78,7 @@ async function main() {
 
     await staking.setupVestingRewards(
       pid,
-      ethers.utils.parseUnits(rewardAmount, await rewardToken.decimals()),
+      ethers.utils.parseEther(rewardAmount),
       rewardStartBlock,
       rewardCliffEnd,
       rewardEndBlock
