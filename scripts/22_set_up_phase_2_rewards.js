@@ -31,31 +31,35 @@ async function main() {
     deployer
   )
 
+  console.log('Approving fund raising contract to move tokens...')
+
   const tx = await rewardToken.approve(fundRaising.address, ethers.constants.MaxUint256)
   await tx.wait()
+
+  console.log('Done!')
 
   // Script prepped for Unizen pools
   const rewardInfo = [
     [
       '0', // Pool ID
       '1111111', // Total rewards
-      'TODO', // reward start block
-      'TODO', // reward cliff block
-      'TODO' // reward end block
+      '12251175', // reward start block
+      '12251175', // reward cliff block
+      '13421050' // reward end block
     ], // Pool 0
     [
       '1', // Pool ID
       '1111111', // Total rewards
-      'TODO', // reward start block
-      'TODO', // reward cliff block
-      'TODO' // reward end block
+      '12251175', // reward start block
+      '12251175', // reward cliff block
+      '13421050' // reward end block
     ], // Pool 1
     [
       '2', // Pool ID
       '1111111', // Total rewards
-      'TODO', // reward start block
-      'TODO', // reward cliff block
-      'TODO' // reward end block
+      '12251175', // reward start block
+      '12251175', // reward cliff block
+      '13421050' // reward end block
     ], // Pool 2
   ];
 
@@ -70,9 +74,11 @@ async function main() {
       rewardEndBlock
     ] = rewardInfo[y]
 
+    prompt(`\nAbout to send rewards - Pool ID ${pid} - Amount ${rewardAmount} - Start block ${rewardStartBlock} - Cliff end block - ${rewardCliffEnd} - End block ${rewardEndBlock}. Hit ok if happy...\n`);
+
     await staking.setupVestingRewards(
       pid,
-      ethers.utils.parseEther(rewardAmount),
+      ethers.utils.parseUnits(rewardAmount, await rewardToken.decimals()),
       rewardStartBlock,
       rewardCliffEnd,
       rewardEndBlock
