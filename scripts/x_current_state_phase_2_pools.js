@@ -32,13 +32,16 @@ async function main() {
       maxStakingAmountPerUser
     } = await funding.poolInfo(x);
 
+    const percentageFunded = ethers.utils.formatEther(await funding.poolIdToTotalFundedPercentageOfTargetRaise(x))
+
     console.log(`
     Reward Token: ${rewardToken}
     tokenAllocationStartBlock: ${tokenAllocationStartBlock}
     stakingEndBlock: ${stakingEndBlock}
     pledgeFundingEndBlock: ${pledgeFundingEndBlock}
     targetRaise: ${ethers.utils.formatEther(targetRaise.toString())}
-    maxStakingAmountPerUser: ${ethers.utils.formatEther(maxStakingAmountPerUser.toString())}
+    maxStakingAmountPerUser: ${ethers.utils.formatEther(maxStakingAmountPerUser.toString())},
+    percentageFunded: ${percentageFunded}%
     \n\n
     `);
   }
