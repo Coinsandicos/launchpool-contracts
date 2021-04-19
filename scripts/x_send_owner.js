@@ -4,7 +4,7 @@ const LaunchPoolFundRaisingWithVestingMetadata = require('../artifacts/contracts
 
 async function main() {
   const [deployer] = await ethers.getSigners();
-  const deployerAddress = await deployer.getAddress()
+  const deployerAddress = await deployer.getAddress();
   console.log(
     "Transferring ownership with the account:",
     deployerAddress
@@ -22,7 +22,7 @@ async function main() {
     deployer //provider
   );
 
-  await staking.transferOwnership('')
+  await staking.transferOwnership('0x3A53b311089DB9b5FE22DA1100E3046c83A5507d');
 
   console.log('Finished!');
 }
