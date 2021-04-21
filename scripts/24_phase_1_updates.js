@@ -44,7 +44,7 @@ async function main() {
 
     const toPoolNewAlloc = toPoolInfo.allocPoint.add(fromPoolInfo.allocPoint)
 
-    prompt(`Setting alloc of ${fromPid} to 0 and increasing ${toPid} to ${toPoolNewAlloc.toString()}`);
+    prompt(`\nSetting alloc of ${fromPid} to 0 and increasing ${toPid} to ${toPoolNewAlloc.toString()}\n`);
 
     await staking.set(
       fromPid.toString(),
