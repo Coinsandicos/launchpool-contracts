@@ -62,12 +62,15 @@ async function main() {
 
     const fromPoolInfoAfter = await staking.poolInfo(fromPid)
     const toPoolInfoAfter = await staking.poolInfo(toPid)
+    const totalAllocAfter = await staking.totalAllocPoint()
 
     console.log(`Pool ID ${fromPid} alloc after: ${fromPoolInfoAfter.allocPoint.toString()}`)
     console.log(`Pool ID ${toPid} alloc after: ${toPoolInfoAfter.allocPoint.toString()}`)
+    console.log(`Total alloc of ${totalAllocAfter.toString()}`);
   }
 
-  console.log('Finished!');
+  const totalAlloc = await staking.totalAllocPoint()
+  console.log(`Finished with a total alloc of ${totalAlloc.toString()}`);
 }
 
 main()
