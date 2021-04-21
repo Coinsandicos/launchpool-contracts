@@ -1,5 +1,5 @@
 const prompt = require('prompt-sync')();
-const LaunchPoolStakingMetadata = require('../artifacts/LaunchPoolStaking.json');
+const LaunchPoolStakingMetadata = require('../artifacts/contracts/LaunchPoolStaking.sol/LaunchPoolStaking.json');
 
 async function main() {
   const [deployer] = await ethers.getSigners();
