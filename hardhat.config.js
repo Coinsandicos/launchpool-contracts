@@ -28,6 +28,10 @@ if (PRIVATE_KEY) {
     testnetbsc: {
       url: `https://data-seed-prebsc-1-s1.binance.org:8545/`,
       accounts: [`${PRIVATE_KEY}`]
+    },
+    mainnetbsc: {
+      url: `https://bsc-dataseed.binance.org/`,
+      accounts: [`${PRIVATE_KEY}`]
     }
   }
 }
