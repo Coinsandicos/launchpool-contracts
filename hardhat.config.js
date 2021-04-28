@@ -25,6 +25,12 @@ if (PRIVATE_KEY) {
       accounts: [`0x${PRIVATE_TEST_KEY}`],
       gasPrice: 130000000000, // 13o gwei
     },
+    ropsten: {
+      url: `https://ropsten.infura.io/v3/${INFURA_PROJECT_ID}`,
+      accounts: [`0x${PRIVATE_TEST_KEY}`],
+      gas:5500000,
+      gasPrice: 130000000000, // 13o gwei
+    },
     testnetbsc: {
       url: `https://data-seed-prebsc-1-s1.binance.org:8545/`,
       accounts: [`${PRIVATE_KEY}`]
